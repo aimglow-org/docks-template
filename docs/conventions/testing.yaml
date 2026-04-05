@@ -137,9 +137,34 @@
     テストランナーの Suite.Run() 終了時に自動実行される品質ゲート。
     テストケース自体が PASS しても、品質検証で FAIL すると全体が FAIL になる。
     skip_validation で明示的除外が可能（理由記載必須）。
-    demaetei プロジェクトの Identity ドメインで実証済み。
     実装例: {domain}/testing/runner.go の validateCategories, validateEnumCoverage,
-    validateIdempotency, validateStubVerifyConsistency, validateErrorCoverage
+    validateIdempotency, validateErrorCoverage
+
+- i: "静的解析（golangci-lint — コード記述時点で検出）"
+  c:
+    - i: "exhaustruct: handler の struct リテラルで全フィールド明示を強制。配線漏れを即検出"
+      n: "対象: usecase Input/Output struct。意図的ゼロ値は //nolint:exhaustruct で抑制"
+    - i: "errcheck: error 戻り値の無視を検出"
+    - i: "gosec: int オーバーフロー、セキュリティ脆弱性を検出"
+    - i: "unused: 未使用 const/func/var を検出"
+    - i: "staticcheck: Go 最大手の静的解析。バグ全般"
+    - i: "設定ファイル: .golangci.yml（プロジェクトルート）"
+    - i: "実行コマンド: golangci-lint run ./libs/{domain}/backend/..."
+  n: |
+    LLM レビューの注意力に頼らず、機械的に検出可能な問題を先に弾く。
+    /rev の前に golangci-lint run を通し、ZERO ISSUES であることを前提条件とする。
+    demaetei Identity ドメインでの実証: /rev 6ラウンドで見つかった36件の75%が
+    これらの linter で1コマンドで検出可能だった。
+
+- i: "dto 全フィールド非ゼロテスト"
+  c:
+    - i: "Domain Entity の全フィールドに非ゼロ値を設定 → dto 変換 → Proto Response の全フィールドが非ゼロであることを reflect で検証"
+    - i: "フィールド追加時に dto 変換で設定し忘れるとテストが自動的に FAIL する"
+    - i: "配置: usecase/dto/dto_completeness_test.go"
+  n: |
+    Proto にフィールドが追加されたとき、dto 変換関数の更新を強制する仕組み。
+    人的レビューで「Response にフィールドが返されていない」を見つけるのではなく、
+    テストで機械的に検出する。
 
 - i: "DB 環境方針"
   c:

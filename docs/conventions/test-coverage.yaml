@@ -175,6 +175,23 @@
     これらの検証は test-runner-go ではなく各ドメインの testing/runner.go に実装する。
     demaetei プロジェクトの Identity ドメインで実証済み。
 
+- i: "静的解析（golangci-lint — コード記述時点で検出）"
+  c:
+    - i: "exhaustruct: handler の struct リテラルで全フィールド明示を強制"
+    - i: "errcheck: error 戻り値の無視を検出"
+    - i: "gosec: int オーバーフロー、セキュリティ脆弱性を検出"
+    - i: "unused: dead code を検出"
+    - i: "staticcheck: バグ全般"
+  n: |
+    /rev の前に golangci-lint run を通し、ZERO ISSUES であることを前提条件とする。
+    設定: .golangci.yml（プロジェクトルート）。exhaustruct は handler/interpoint のみ適用。
+
+- i: "dto 全フィールド非ゼロテスト"
+  c:
+    - i: "Domain Entity → dto 変換 → Proto Response の全フィールドが非ゼロであることを reflect で検証"
+    - i: "フィールド追加時に dto 変換で設定し忘れるとテストが自動的に FAIL する"
+  n: "配置: usecase/dto/dto_completeness_test.go"
+
 - i: "validator 検証ルール"
   c:
     - i: "必須検証（error レベル — 違反はテスト実行をブロック）"
