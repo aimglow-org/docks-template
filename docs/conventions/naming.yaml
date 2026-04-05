@@ -1,0 +1,171 @@
+# naming.yaml — 命名規約
+# DDD/SDD/TDD に基づくプロジェクトの命名ルール
+# 要素記法: i(アイテム — 全要素の基本), c(子要素リスト — i の下にネスト), n(ノート — 補足説明)
+
+- i: "統一命名規則: {分類名}-{名前}-{実装言語}"
+  c:
+    - i: "モノレポ内のすべてのパッケージは {分類名}-{名前}-{実装言語} の形式で命名する"
+    - i: "この規則により、パッケージ名から「何のカテゴリの、何を、何の言語で実装しているか」が一目で分かる"
+    - i: "分類名一覧"
+      c:
+        - i: "gcp — Google Cloud Platform サービス"
+        - i: "fb — Firebase サービス"
+        - i: "api — 外部 API クライアント"
+        - i: "test — テスト関連ユーティリティ"
+        - i: "feature — フロントエンド機能実装"
+    - i: "実装言語一覧"
+      c:
+        - i: "go — Go"
+        - i: "next — Next.js (TypeScript)"
+        - i: "flutter — Flutter (Dart)"
+        - i: "kotlin — Kotlin (Android)"
+        - i: "swift — Swift (iOS)"
+  n: "パッケージ名だけで GitHub 上から内容を特定できることが目的"
+
+- i: "ディレクトリ命名"
+  c:
+    - i: "ドメイン（libs/domains/）"
+      c:
+        - i: "libs/domains/{domain}/ — ドメイン名は英語小文字・単数形"
+        - i: "例: {domain-a}, {domain-b}（/des で定義したドメイン名）"
+        - i: "バックエンド"
+          c:
+            - i: "libs/domains/{domain}/backend/ — Go 実装"
+            - i: "内部: define/, usecase/, infrastructure/, entrypoint/"
+        - i: "フロントエンド"
+          c:
+            - i: "libs/domains/{domain}/feature-{機能名}-{言語}/"
+            - i: "例: libs/domains/finance/feature-ledger-next/"
+            - i: "例: libs/domains/habits/feature-tracker-flutter/"
+          n: "同一ドメインに複数プラットフォームの実装が共存できる"
+      n: "ドメイン名はビジネス用語に合わせる。技術用語は使わない"
+    - i: "プラットフォーム（libs/platform/）"
+      c:
+        - i: "libs/platform/{分類名}-{サービス名}-{言語}/"
+        - i: "例: gcp-cloudsql-go, gcp-cloudstorage-go"
+        - i: "例: fb-auth-go, fb-auth-next"
+        - i: "例: api-openai-go, api-stripe-go"
+      n: "外部依存の実体。命名から何に接続するか一目でわかるようにする"
+    - i: "共有（libs/shared/）"
+      c:
+        - i: "libs/shared/{分類名}-{名前}-{言語}/"
+        - i: "例: test-runner-go"
+        - i: "例: types-common-go（将来）"
+      n: "複数ドメインから参照される共通パッケージ"
+    - i: "4+α層構成（ドメインバックエンド内）"
+      c:
+        - i: "define/ — 型・インターフェース定義"
+        - i: "usecase/ — ビジネスロジック"
+        - i: "usecase/dto/ — Proto ↔ Domain 変換層"
+        - i: "infrastructure/ — 外部依存の実装"
+        - i: "entrypoint/ — ハンドラ・公開API（FE向け、Bearer token）"
+        - i: "interpoint/ — サービス間内部API（ドメイン間通信、mTLS）"
+      n: "基本4層の名前は変更しない。interpoint/ はドメイン間通信が必要な場合のみ追加"
+    - i: "shared ライブラリ内部構造"
+      c:
+        - i: "define.go — 公開 interface + 型定義（SDD 契約。必須）"
+        - i: "各パッケージ/ — define.go の interface を実装"
+        - i: "4層構成は適用しない。SDD（interface 先行）のみ適用する"
+      n: "ドメインより軽い構造。ただし interface 定義は省略しない"
+
+- i: "Go 命名規約"
+  c:
+    - i: "パッケージ名"
+      c:
+        - i: "小文字・単一単語。アンダースコアやハイフンは使わない"
+        - i: "例: define, usecase, infrastructure, entrypoint"
+        - i: "例: loader, validator, mockbuilder, dbhelper"
+        - i: "パッケージ名とディレクトリ名を一致させる"
+      n: "Go モジュール名にはハイフンを含む（test-runner-go）が、パッケージ名は小文字単語"
+    - i: "ファイル名"
+      c:
+        - i: "スネークケース（snake_case）"
+        - i: "例: dialogue_repository.go, save_dialogue.go"
+        - i: "テストファイル: {name}_test.go"
+    - i: "型名・インターフェース名"
+      c:
+        - i: "パスカルケース（PascalCase）"
+        - i: "インターフェース: 動詞 + er または 役割名"
+        - i: "例: DialogueRepository, DialogueSaver"
+      n: "Go の慣習に従う。I プレフィックス（IRepository）は使わない"
+    - i: "関数・メソッド名"
+      c:
+        - i: "パスカルケース（公開）/ キャメルケース（非公開）"
+        - i: "例: SaveDialogue (公開), validateInput (非公開)"
+    - i: "変数名"
+      c:
+        - i: "キャメルケース（camelCase）"
+        - i: "短く意味が明確なもの。1文字変数はループカウンタのみ"
+        - i: "例: dialogueID, createdAt, err"
+
+- i: "設計書命名"
+  c:
+    - i: "ドメイン基本設計 YAML"
+      c:
+        - i: "def.yaml — 定義（エンティティ、値オブジェクト）"
+        - i: "rule.yaml — ビジネスルール"
+        - i: "store.yaml — データストア設計"
+        - i: "ref.yaml — ドメイン間参照"
+        - i: "schema.yaml — スキーマ定義"
+        - i: "fn-{機能名}.yaml — 機能仕様"
+      n: "ファイル名は固定。ドメインごとに同じ名前で統一する"
+    - i: "shared ライブラリ設計"
+      c:
+        - i: "def.yaml — interface 定義（SDD 契約）"
+        - i: "spec.yaml — パッケージ別仕様"
+        - i: "detaildesign.md — 詳細設計"
+      n: "ドメインより軽い構成。rule/store/ref/schema は不要"
+    - i: "実装タスク"
+      c:
+        - i: "impl-{nnn}.prog.md — 進行中"
+        - i: "impl-{nnn}.done.md — 完了"
+      n: "nnn は 001 から連番。ステータスはファイル名の拡張子前で管理"
+
+- i: "PII・暗号化関連の命名"
+  c:
+    - i: "{field}_hash — 検索用 HMAC-SHA256 ハッシュカラム"
+      c:
+        - i: "例: email_hash, phone_hash"
+    - i: "暗号化カラムは BYTEA 型。カラム名はそのまま（例: email BYTEA）"
+  n: "PII 暗号化パターンの DB カラム命名。design.yaml の PII セクション参照"
+
+- i: "statics（エラーコード）命名"
+  c:
+    - i: "エラーコード: E_{DOMAIN_SHORT}_{ERROR_NAME}"
+      c:
+        - i: "例: E_FIN_INVALID_AMOUNT, E_HAB_DUPLICATE_ENTRY"
+    - i: "ドメイン略称（DOMAIN_SHORT）"
+      c:
+        - i: "（/des でドメイン定義時に略称を追加する）"
+      n: "新ドメイン追加時にここに略称を追加する"
+    - i: "番号帯管理ファイル: domain-codes.yaml（api-schema orphan branch）"
+  n: "api-schema の statics/ に定義。design.yaml の api-schema セクション参照"
+
+- i: "世代管理の命名"
+  c:
+    - i: "current_{table} — 現在有効なレコードのみを返すビュー"
+      c:
+        - i: "例: current_pricing_plans, current_permission_rules"
+    - i: "MasterFields — 世代管理対象エンティティの embedding 構造体"
+  n: "design.yaml の世代管理パターン参照"
+
+- i: "ブランチ命名"
+  c:
+    - i: "docks/develop — 開発主流"
+    - i: "docks/feature/{issue番号}-{概要} — 機能ブランチ"
+    - i: "例: docks/feature/12-mcp-gcp-init"
+
+- i: "コミットメッセージ"
+  c:
+    - i: "{type}({scope}): {summary}"
+    - i: "type"
+      c:
+        - i: "feat — 新機能"
+        - i: "fix — バグ修正"
+        - i: "docs — ドキュメント"
+        - i: "refactor — リファクタリング"
+        - i: "chore — 雑務"
+        - i: "test — テスト"
+    - i: "scope"
+      c:
+        - i: "（/des で定義したドメイン名、platform, test-runner など）"

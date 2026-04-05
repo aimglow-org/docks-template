@@ -1,0 +1,205 @@
+# implementation.yaml — 実装規約
+# 設計から実装までのルール定義。実行は /imp コマンドが駆動する。
+# 要素記法: i(アイテム — 全要素の基本), c(子要素リスト — i の下にネスト), n(ノート — 補足説明)
+
+- i: "この規約の位置づけ"
+  c:
+    - i: "この YAML はルール定義。「何を守るか」を記述する"
+    - i: "/imp コマンドは実行エンジン。「どう駆動するか」を記述する"
+    - i: "CC セッションは /imp コマンドでフローを起動し、この規約のルールに従う"
+  n: "規約（conventions/）と実行（.claude/commands/）を分離する"
+
+
+- i: "設計フロー"
+  c:
+    - i: "Step 1: 規約の読み込み（/imp init）"
+      c:
+        - i: "conventions/ 配下の全ファイルを読む"
+        - i: "関連ドメインの設計書を読む"
+      n: "これを省略して実装に入らない。必須手順"
+    - i: "Step 2: 基本設計（/imp basic-design）"
+      c:
+        - i: "def.yaml"
+          c:
+            - i: "エンティティの定義（ID、属性、振る舞い）"
+            - i: "値オブジェクトの定義"
+            - i: "集約ルートの特定"
+        - i: "rule.yaml"
+          c:
+            - i: "ビジネスルール（不変条件、制約）"
+            - i: "ドメインイベント"
+        - i: "store.yaml"
+          c:
+            - i: "テーブル設計（CloudSQL）"
+            - i: "バケット構成（GCS）"
+            - i: "インデックス設計"
+        - i: "ref.yaml"
+          c:
+            - i: "他ドメインへの参照関係"
+            - i: "ドメイン間通信の方向と契約"
+          n: "ドメイン間通信が不要なら「なし」と記載。空にしない"
+        - i: "schema.yaml"
+          c:
+            - i: "SQL DDL"
+            - i: "マイグレーション方針"
+        - i: "fn-{機能名}.yaml"
+          c:
+            - i: "機能ごとに 1 ファイル"
+            - i: "interface セクション"
+              c:
+                - i: "入力パラメータ（型、必須/任意、制約）"
+                - i: "出力（正常系、異常系）"
+                - i: "Go の interface 定義案"
+            - i: "usecase セクション"
+              c:
+                - i: "処理フロー（ステップバイステップ）"
+                - i: "ビジネスルールの適用箇所"
+                - i: "エラーケースと対処"
+            - i: "ui セクション"
+              c:
+                - i: "MCP ツール定義（名前、説明、パラメータ）"
+              n: "紬では ui = MCP ツールハンドラ。フロントがある場合は画面仕様"
+      n: "YAML は Workflowy にアップロードして俯瞰できる形式を維持する"
+    - i: "Step 3: 詳細設計（/imp detail-design）"
+      c:
+        - i: "YAML の内容を実装レベルに落とし込む"
+        - i: "Go の型名、関数シグネチャ、エラー型を具体的に記述する"
+        - i: "SQL クエリを具体的に記述する"
+        - i: "非機能要件（認証、ログ、エラーハンドリング）を確定する"
+        - i: "テストケース一覧を確定する"
+      n: "曖昧表現の禁止:「〜する予定」「〜かもしれない」「〜を検討」「必要に応じて」「おそらく」「など」"
+    - i: "Step 4: 実装タスク作成（/imp task）"
+      c:
+        - i: ".task/impl-{nnn}.prog.md を作成する"
+        - i: "1タスク = 1つの完結した実装単位"
+        - i: "タスクには対象ファイル、入力、期待する出力を明記する"
+        - i: "依存タスク（先行タスク）を明記する"
+    - i: "Step 5: コード実装（/imp code）"
+      c:
+        - i: "define/ → usecase/ → infrastructure/ → entrypoint/ の順で実装する"
+        - i: "platform/ は infrastructure/ より先に実装する"
+        - i: "各層を実装するたびにテストを書く（TDD）"
+        - i: "即時都度コミットする"
+        - i: "前の層のテストが通るまで次の層に進まない"
+    - i: "Step 6: デプロイ（/imp deploy）"
+      c:
+        - i: "全テスト通過を確認してからデプロイする"
+        - i: "デプロイコマンドはユーザー確認後に実行する"
+
+- i: "YAML 要素記法（Workflowy 互換）"
+  c:
+    - i: "i: — 単一アイテム"
+    - i: "c: — 子要素を持つ親（children）"
+    - i: "n: — ノート（補足説明）"
+
+- i: "実装タスクの管理ルール"
+  c:
+    - i: "ファイル構成"
+      c:
+        - i: "配置先: docs/domains/{domain}/.task/"
+        - i: "shared の場合: docs/shared/{lib名}/.task/"
+        - i: "ファイル名: impl-{nnn}.{status}.md"
+        - i: "status: prog（進行中）, done（完了）"
+        - i: "完了時にファイル名を impl-{nnn}.done.md にリネームする"
+    - i: "テンプレート（必須フィールド）"
+      c:
+        - i: |
+            # impl-{nnn}: {タスク名}
+
+            ## メタ情報
+            - scope: {domain / platform / shared}
+            - domain: {dialogue / finance / habits / relationships}  ← scope=domain の場合のみ
+            - layer: {define / usecase / infrastructure / entrypoint}  ← scope=domain の場合のみ
+            - package: {gcp-cloudsql-go / test-runner-go / ...}  ← scope=platform|shared の場合のみ
+            - review: {自動決定 — マッピングテーブル参照}
+
+            ## 対象ファイル
+            - {ファイルパス}
+
+            ## 実装内容
+            {具体的な実装内容}
+
+            ## 依存タスク
+            - {先行タスクの impl 番号（なければ「なし」）}
+
+            ## 完了条件
+            - [ ] コードが実装されている
+            - [ ] テストデータ（testdata/*.yaml）が作成されている
+            - [ ] テストコードが書かれている
+            - [ ] テストが通る
+            - [ ] コミット済み
+
+            ## 完了メモ
+            （作業完了時に記入）
+      n: "scope によって必須フィールドが異なる。domain/layer は scope=domain でのみ使用。package は scope=platform|shared でのみ使用"
+    - i: "メタ情報のマッピングテーブル"
+      c:
+        - i: "scope=domain の場合: layer → review"
+          c:
+            - i: "define �� impl-define"
+            - i: "usecase → impl-usecase"
+            - i: "infrastructure → impl-infrastructure"
+            - i: "entrypoint → impl-entrypoint"
+            - i: "interpoint → impl-interpoint"
+        - i: "scope=platform の場合: → impl-platform"
+          c:
+            - i: "package に関わらず impl-platform"
+        - i: "scope=shared の場合: package → review"
+          c:
+            - i: "test-runner-go → test-runner"
+            - i: "その他 → impl-shared"
+          n: "shared の新しいパッケージが追加された場合、ここにマッピングを追加する"
+        - i: "status の意味"
+          c:
+            - i: "prog — 進行中。/rev はこのタスクの review フィールドを読んでレビュー種別を決定する"
+            - i: "done — 完了。/rev の対象外"
+      n: "/rev（引数なし）は .prog.md の review フィールドを読んでレビュー種別を自動決定する"
+    - i: "GitHub Issues との関係"
+      c:
+        - i: "実装タスクは Issue 不要。.task/ で完結する"
+        - i: "Issues は方針決定、バグ報告、セッション横断の議題に使う"
+      n: "実装の粒度は .task/、方針の粒度は Issues"
+
+- i: "ワークストリーム分離"
+  c:
+    - i: "ドメイン実装セッション"
+      c:
+        - i: "責務: libs/domains/{domain}/ 内の4+α層の実装"
+        - i: "スコープ外: apps/ の main.go、docker-compose、seed データ"
+        - i: "引き渡し: register.go パターンで entrypoint/interpoint のハンドラ登録関数を公開する"
+      n: "ドメインセッションは libs/ に閉じる。apps/ は Integration セッションの責務"
+    - i: "Integration ���ッション"
+      c:
+        - i: "責務: apps/ の main.go（DI 組み立て）、docker-compose、seed、deploy"
+        - i: "ドメインセッションの成果物（register.go）を組み合わせてアプリケーションを構成す��"
+      n: "コンテキスト管理の観点で分離。1セッションに全てを詰め込まない"
+    - i: "分離の判断基準"
+      c:
+        - i: "小規模（ドメイン1つ、MCP 専用）: 分離不要。1セッションで完結"
+        - i: "中規模以上（複数ドメイン、FE あり）: ドメインごとにセッション分離"
+  n: "セッション分離はプロジェクト規模に応じて適用する。小規模なら不要"
+
+- i: "実��の原則"
+  c:
+    - i: "define/ を先に書く。他の層は define/ に従う"
+    - i: "1コミット = 1���の意味のある変更"
+    - i: "コンパイルが通らない状態でコミットしない"
+    - i: "テス���が通らない状態で次の層に進まない"
+    - i: "迷った�� Solviento に戻る。Dock で方針判断しない"
+
+- i: "レビュー連携"
+  c:
+    - i: "各フェーズ完了後に /rev コマンドでレビューを実行する"
+    - i: "レビュー種別はフェーズに対応する（review.yaml 参照）"
+    - i: "推奨レビュータイミング"
+      c:
+        - i: "基本設計完了後: /rev basic-design"
+        - i: "詳細設計完了後: /rev detail-design"
+        - i: "define/ 実装後: /rev impl-define"
+        - i: "usecase/ 実装後: /rev impl-usecase"
+        - i: "infrastructure/ 実装後: /rev impl-infrastructure"
+        - i: "entrypoint/ 実装後: /rev impl-entrypoint"
+        - i: "デプロイ前: /rev deploy"
+        - i: "マージ前: /rev full"
+  n: "レビューは任意だが推奨。critical 指摘が 0 件になるまで修正する"
+

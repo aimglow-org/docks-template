@@ -1,0 +1,9 @@
+{
+  "name": "{{project-name}}",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "api-schema:sync": "node tools/api-schema-sync.js"
+  },
+  "devDependencies": {}
+}

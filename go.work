@@ -1,0 +1,10 @@
+go 1.23
+
+// /des でドメイン追加時に use ディレクティブを追加する
+// 例:
+// use (
+//     ./libs/domains/{domain}/backend
+//     ./libs/platform/gcp-cloudsql-go
+//     ./libs/shared/test-runner-go
+//     ./apps/{app-name}
+// )

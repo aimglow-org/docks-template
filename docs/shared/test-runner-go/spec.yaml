@@ -1,0 +1,183 @@
+# spec.yaml — test-runner-go パッケージ別仕様
+# 各パッケージの入出力と責務
+# 要素記法: i(アイテム — 全要素の基本), c(子要素リスト — i の下にネスト), n(ノート — 補足説明)
+
+- i: "パッケージ構成"
+  c:
+    - i: |
+        libs/shared/test-runner-go/
+          ├── define.go          ← 公開 interface + 型（def.yaml の実体）
+          ├── loader/            ← TestCaseLoader 実装
+          │   ├── yaml_loader.go
+          │   └── yaml_loader_test.go
+          ├── validator/         ← CoverageValidator 実装
+          │   ├── validator.go
+          │   ├── rules.go
+          │   └── validator_test.go
+          ├── mock/              ← MockBuilder + SideEffectVerifier 実装
+          │   ├── builder.go
+          │   ├── verifier.go
+          │   └── mock_test.go
+          ├── assert/            ← WantAsserter 実装
+          │   ├── asserter.go
+          │   └── asserter_test.go
+          ├── dbhelper/          ← DBHelper 実装
+          │   ├── helper.go
+          │   └── helper_test.go
+          ├── cmd/
+          │   └── validate/      ← CLI: /test validate から呼ばれる
+          │       └── main.go
+          ├── go.mod
+          └── go.sum
+
+- i: "loader/ — YAML ローダー"
+  c:
+    - i: "責務"
+      c:
+        - i: "testdata/*.yaml を読み込み、[]TestCase に変換する"
+        - i: "i/c/n 記法（Workflowy 互換）を解釈する"
+        - i: "Generics 対応: Input を任意の型 T にデシリアライズする"
+    - i: "入力"
+      c:
+        - i: "path: string — testdata YAML ファイルパス"
+    - i: "出力"
+      c:
+        - i: "[]TestCase — パース済みテストケース一覧"
+        - i: "error — パースエラー（YAML 不正、必須フィールド欠落）"
+    - i: "YAML パースルール"
+      c:
+        - i: "トップレベルの c: がテストケース名になる"
+        - i: "children 内の c: 'strategy' → Strategy フィールドにマッピング"
+        - i: "children 内の c: 'input' → Input フィールドにマッピング"
+        - i: "children 内の c: 'want' → WantSpec にマッピング"
+        - i: "children 内の c: 'mock' → MockSpec にマッピング"
+        - i: "children 内の c: 'setup' → []SetupSpec にマッピング"
+        - i: "children 内の c: 'side_effect' → SideEffectSpec にマッピング"
+        - i: "n: → Note フィールドにマッピング"
+    - i: "バリデーション"
+      c:
+        - i: "テストケース名（c: の値）が空の場合はエラー"
+        - i: "strategy.type が未定義の場合はデフォルト data-driven"
+        - i: "input が空の場合は warning（ログ出力のみ）"
+
+- i: "validator/ — 網羅性検証"
+  c:
+    - i: "責務"
+      c:
+        - i: "testdata YAML と設計 YAML（def/rule/fn-*）の整合性を検証する"
+        - i: "test-coverage.yaml の検証ルールを実装する"
+    - i: "入力"
+      c:
+        - i: "ValidateConfig — testdata パス + 設計 YAML パス群"
+    - i: "出力"
+      c:
+        - i: "ValidationResult — errors/warnings/infos"
+    - i: "検証ルール実装"
+      c:
+        - i: "error ルール（必須）"
+          c:
+            - i: "required_field_error_case: def.yaml の必須フィールドに対する欠落異常系の存在"
+            - i: "defined_error_coverage: fn-*.yaml のエラーケースに対応するテストケースの存在"
+            - i: "has_normal_case: 正常系が最低 1 件存在する"
+            - i: "has_both_success_and_error: want.error が null と非 null の両方が存在する"
+        - i: "warning ルール（推奨）"
+          c:
+            - i: "boundary_values: 数値パラメータの境界値テスト"
+            - i: "array_patterns: 配列パラメータの 0/1/N 件テスト"
+            - i: "side_effect_coverage: mock 使用時の side_effect 検証"
+            - i: "semi_normal_cases: 準正常系テストの存在"
+            - i: "failure_cases: 障害系テストの存在"
+        - i: "info ルール（情報）"
+          c:
+            - i: "case_summary: ケース総数と分類内訳"
+            - i: "enum_coverage: 未カバーの enum 値"
+    - i: "設計 YAML パーサー"
+      c:
+        - i: "def.yaml から必須フィールド一覧を抽出する"
+        - i: "rule.yaml から状態遷移定義を抽出する"
+        - i: "fn-*.yaml からエラーケース一覧を抽出する"
+      n: "設計 YAML も i/c/n 記法なので、loader/ の YAML パーサーを共有する"
+
+- i: "mock/ — モックビルダー + 検証"
+  c:
+    - i: "責務"
+      c:
+        - i: "YAML の mock セクションからモックの振る舞いを構築する"
+        - i: "side_effect セクションに基づき呼び出し履歴を検証する"
+    - i: "MockBuilder"
+      c:
+        - i: "MockSpec を受け取り、MockSet を返す"
+        - i: "各 MockBehavior（success/error/skip）を関数に変換する"
+        - i: "呼び出し履歴を自動記録する"
+      n: "ドメイン固有の interface モックは、各ドメインの _test.go 内で定義する。MockBuilder はその振る舞いを設定するだけ"
+    - i: "SideEffectVerifier"
+      c:
+        - i: "MockSet の呼び出し履歴と SideEffectSpec を照合する"
+        - i: "不一致の場合は t.Errorf で報告する"
+    - i: "ドメイン固有モックとの連携"
+      c:
+        - i: "test-runner-go はドメインの interface を知らない"
+        - i: "各ドメインの _test.go で「モック構造体」を定義する"
+        - i: "モック構造体は MockSet の振る舞い設定を受け取る adapter を持つ"
+        - i: |
+            // 例: dialogue/backend/usecase/save_dialogue_test.go
+            type mockDialogueRepo struct {
+                storeFunc func(ctx context.Context, d define.Dialogue) error
+                calls     []mockCall
+            }
+            func (m *mockDialogueRepo) ApplyMock(ms mock.MockSet) {
+                // MockSet から振る舞いを設定
+            }
+      n: "test-runner-go は汎用。ドメイン固有の型を import しない"
+
+- i: "assert/ — 期待値検証"
+  c:
+    - i: "責務"
+      c:
+        - i: "WantSpec に基づき、実際の結果と期待値を比較する"
+    - i: "検証ロジック"
+      c:
+        - i: "error フィールド: null → err == nil, エラー名 → errors.Is チェック"
+        - i: "not_empty → reflect で空値チェック"
+        - i: "any → スキップ"
+        - i: "具体値 → reflect.DeepEqual"
+        - i: "ネストしたフィールド: 'dialogues[0].session_id' → インデックスアクセス + フィールドアクセス"
+      n: "reflect を使うが、型安全性のために TypedTestCase と併用を推奨"
+
+- i: "dbhelper/ — テスト用 DB ヘルパー"
+  c:
+    - i: "責務"
+      c:
+        - i: "テスト用 PostgreSQL に接続する"
+        - i: "setup セクションの INSERT/UPLOAD を実行する"
+        - i: "テスト後にデータをクリーンアップする"
+    - i: "依存"
+      c:
+        - i: "platform/gcp-cloudsql-go の DB interface を使用する"
+      n: "dbhelper は platform に依存する。integration テストでのみ使用"
+    - i: "クリーンアップ方式"
+      c:
+        - i: "各テストをトランザクション内で実行し、テスト後にロールバックする"
+      n: "テスト間の独立性を保証する"
+
+- i: "cmd/validate/ — CLI ツール"
+  c:
+    - i: "責務"
+      c:
+        - i: "/test validate から呼ばれる CLI"
+        - i: "引数で testdata パスと設計 YAML パスを受け取る"
+        - i: "ValidationResult を標準出力に整形出力する"
+        - i: "error があれば exit code 1 を返す"
+    - i: "使用例"
+      c:
+        - i: |
+            go run ./libs/shared/test-runner-go/cmd/validate/ \
+              --testdata ./libs/domains/dialogue/backend/usecase/testdata/ \
+              --def ./docs/domains/dialogue/def.yaml \
+              --rule ./docs/domains/dialogue/rule.yaml \
+              --fn ./docs/domains/dialogue/fn-dialogue-save.yaml \
+              --fn ./docs/domains/dialogue/fn-dialogue-search.yaml
+    - i: "Nx 統合"
+      c:
+        - i: "project.json に validate ターゲットを定義する"
+        - i: "nx run test-runner-go:validate で実行可能にする"

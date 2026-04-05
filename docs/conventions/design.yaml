@@ -1,0 +1,705 @@
+# design.yaml — 設計方針規約
+# DDD/SDD/TDD の三方針、アーキテクチャ、レイヤー構成、スキーマ変更ルール
+# 要素記法: i(アイテム — 全要素の基本), c(子要素リスト — i の下にネスト), n(ノート — 補足説明)
+
+- i: "三方針"
+  c:
+    - i: "DDD（ドメイン駆動設計）"
+      c:
+        - i: "ドメインロジックは libs/domains/ に閉じる"
+        - i: "platform の詳細に依存しない"
+        - i: "ドメイン境界を越える通信は api-schema/ で定義する"
+        - i: "エンティティと値オブジェクトを明確に区別する"
+        - i: "ユビキタス言語: コード内の命名はビジネス用語に合わせる。技術用語でドメインを汚さない"
+      n: "ドメインが中心。インフラやフレームワークはドメインに従属する"
+    - i: "SDD（スキーマ駆動設計 — スキーマファースト）"
+      c:
+        - i: "define/ のインターフェースを先に書く。実装はインターフェースに従う"
+        - i: "ドメイン間通信は proto（gRPC）で定義する。疎結合を基本とする"
+        - i: "proto 定義は api-schema/proto-internal/ に配置する"
+        - i: "スキーマが全ての契約の源泉。スキーマなき実装は禁止する"
+        - i: "スキーマ変更は重量レビューを伴う（後述）"
+      n: "契約が先、実装が後。逆にしない。スキーマが変わるということは、全ての利用者に影響する"
+    - i: "TDD（テスト駆動開発 — テストファースト）"
+      c:
+        - i: "テストデータ（testdata/*.yaml）を先に書く"
+        - i: "テストコード（*_test.go）を先に書く"
+        - i: "実装コードはテストを通すために書く"
+        - i: "テストが通る最小限の実装を書き、その後リファクタリングする"
+        - i: "usecase 層はモックを使って platform から独立してテスト"
+        - i: "infrastructure 層は統合テスト（Docker PostgreSQL）で検証"
+      n: "Red → Green → Refactor のサイクルを各層で回す"
+
+- i: "アーキテクチャ定義"
+  c:
+    - i: "モノレポ構成（Nx）"
+      c:
+        - i: "apps/ — デプロイ可能なアプリケーション"
+        - i: "libs/ — 再利用可能なライブラリ"
+        - i: "tools/ — 開発支援ツール"
+        - i: "docs/ — 設計書"
+        - i: "infra/ — Terraform（IaC）"
+    - i: "infra/ 構成（Terraform）"
+      c:
+        - i: "infra/modules/ — GCP リソーステンプレート（cloud-run, cloudsql, gcs, secret-manager 等）"
+        - i: "infra/environments/{env}/ — 環境別設定（dev, stg, prod）"
+        - i: "各 module は variables.tf で入力を受け、環境・アプリケーション毎に terraform.tfvars で値を注入する"
+        - i: "環境変数・秘匿情報の管理"
+          c:
+            - i: "prod, stg: Secret Manager で管理する"
+            - i: "dev: .env ファイルで管理する（.gitignore に追加）"
+      n: "GCP リソース定義はすべて modules/ でテンプレート化し、環境差分は environments/ の tfvars のみで吸収する"
+    - i: "Terraform State 管理"
+      c:
+        - i: "backend: GCS（環境別に独立した state を保持する）"
+          c:
+            - i: "dev: {project}-tfstate-dev/"
+            - i: "stg: {project}-tfstate-stg/"
+            - i: "prod: {project}-tfstate-prod/（IAM で厳格制限）"
+        - i: "state ロック: GCS のオブジェクトバージョニング有効化"
+        - i: "state 暗号化: GCP の管理キー（CMEK）で暗号化"
+      n: "状態管理は Terraform の基盤。tfstate を失うと全リソースの再作成が必要になる"
+    - i: "Terraform module テンプレート方針"
+      c:
+        - i: "cloud-run: variables（image, port, memory, cpu, concurrency, env_vars）→ outputs（service_url, service_account_email）"
+        - i: "cloudsql: variables（tier, version, backup_config, flags）→ outputs（connection_name, instance_ip）"
+        - i: "gcs: variables（bucket_name, versioning, lifecycle）→ outputs（bucket_url）"
+        - i: "secret-manager: variables（secret_name, secret_data）→ outputs（secret_version）"
+        - i: "環境別設定マージ: terraform apply -var-file=base.tfvars -var-file={env}.tfvars"
+      n: "module は再利用可能であること。ハードコード値ゼロ"
+    - i: "Atlas と Terraform の責務分担"
+      c:
+        - i: "Terraform の責務: CloudSQL インスタンス作成・管理、Auth Proxy サービスアカウント設定"
+        - i: "Atlas の責務: スキーマ定義（schema.hcl）の同期、マイグレーション（atlas migrate apply）の実行"
+        - i: "連携方法: Terraform で CloudSQL 作成後、Atlas が接続。接続文字列は環境変数で共有"
+        - i: "CI での実行順序: terraform apply → atlas migrate apply"
+      n: "Terraform はインフラリソース、Atlas は DB スキーマ。責務を混ぜない"
+    - i: "CI/CD（GitHub Actions）"
+      c:
+        - i: "Terraform Pipeline"
+          c:
+            - i: "トリガー: infra/ 配下の変更、または手動 workflow_dispatch"
+            - i: "ステップ: terraform init → fmt -check → validate → plan（artifact 保存）→ apply"
+            - i: "dev: plan 後に自動 apply"
+            - i: "stg/prod: GitHub Environment Protection Rules で手動 approval 後に apply"
+        - i: "Docker Build & Deploy"
+          c:
+            - i: "トリガー: libs/, apps/ の変更"
+            - i: "イメージ: Artifact Registry に push（{region}-docker.pkg.dev/{project}/{repo}:{git-sha}）"
+            - i: "Cloud Run デプロイ: dev/stg は自動、prod は手動 approval"
+        - i: "テスト Pipeline"
+          c:
+            - i: "トリガー: libs/, apps/ の変更"
+            - i: "ステップ: go test ./... → lint → build"
+      n: "環境別に apply/deploy の自動化レベルを調整する。prod は必ず approval 必須"
+    - i: "Dockerfile 規約"
+      c:
+        - i: "マルチステージビルド"
+          c:
+            - i: "ビルドステージ: golang:{version}-bookworm"
+            - i: "実行ステージ: gcr.io/distroless/base-debian12（セキュリティ最小化）"
+        - i: "ヘルスチェック: /healthz エンドポイント実装（HTTP 200 OK）"
+        - i: "セキュリティ: root 実行禁止（nonroot ユーザー使用）、イメージスキャン（CI で trivy scan）"
+        - i: ".dockerignore で testdata/, docs/ 等を除外"
+      n: "イメージサイズ最小化と脆弱性対策を両立"
+    - i: "Cloud SQL 接続方式"
+      c:
+        - i: "Cloud Run: Cloud SQL Connector for Go（IAM 認証、username/password 不要）"
+        - i: "ローカル開発: cloud-sql-proxy --port=5433 {connection-name}"
+        - i: "接続プール設定（libs/platform/gcp-cloudsql-go/）: MaxOpenConns: 25, MaxIdleConns: 5, ConnMaxLifetime: 5min"
+      n: "Cloud Run のメモリと CPU に応じて接続プール設定を調整する"
+    - i: "セキュリティ設計（IAM / ネットワーク）"
+      c:
+        - i: "Cloud Run サービスアカウント（最小権限）"
+          c:
+            - i: "roles/cloudsql.client（CloudSQL 接続）"
+            - i: "roles/storage.objectViewer + objectCreator（GCS 読み書き）"
+            - i: "roles/secretmanager.secretAccessor（Secret Manager 読み取り）"
+        - i: "Cloud SQL: prod は Private IP のみ、dev は Public IP（Auth Proxy 経由）"
+        - i: "Cloud Run ↔ CloudSQL: Cloud SQL Connector でアプリケーション層暗号化"
+      n: "本番環境は Private IP + IAM + Cloud SQL Connector で多層防御"
+    - i: "ローカル開発環境"
+      c:
+        - i: "docker-compose.yaml で PostgreSQL を起動"
+          c:
+            - i: "postgres:{version}-bookworm（ports: 5433:5432）"
+            - i: "POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB を設定"
+        - i: "起動手順: docker compose up -d → atlas migrate apply → go test ./..."
+        - i: ".env.example をリポジトリに配置（マスク値）。.env は .gitignore に追加"
+      n: "ローカル開発がのべ 30 分以内で開始可能であること"
+    - i: "デプロイメント戦略（prod）"
+      c:
+        - i: "新リビジョンを 0% トラフィックでデプロイ → ヘルスチェック確認 → 100% に切り替え"
+        - i: "ロールバック: gcloud run services update-traffic で即座に前バージョンに戻す"
+        - i: "旧リビジョンは 48 時間保持後に削除"
+      n: "prod は常に段階的デプロイ。1 ステップでの全トラフィック切り替え禁止"
+    - i: "libs/ の scope 分類"
+      c:
+        - i: "libs/domains/ — ドメインロジック（DDD bounded contexts）"
+        - i: "libs/platform/ — 外部接続実体（GCP, Firebase, 外部API）"
+        - i: "libs/shared/ — 複数ドメインから参照される共通コード"
+        - i: "libs/api-schema/ — インターフェース定義（proto）"
+      n: "scope は domain / platform / shared の3分類。impl タスクのメタ情報にも使用する"
+    - i: "通信方式"
+      c:
+        - i: "CC → MCP Server: Streamable HTTP（Cloud Run 上に直接接続）"
+        - i: "ドメイン間通信: gRPC（api-schema/proto-internal/ で定義）"
+        - i: "外部公開 API: gRPC（api-schema/proto/ で定義）"
+        - i: "proto 管理: buf + connect-go"
+      n: "ドメイン間は必ず gRPC で疎結合にする。直接の Go 関数呼び出しは禁止"
+    - i: "技術スタック"
+      c:
+        - i: "バックエンド言語: Go"
+        - i: "モノレポ管理: Nx"
+        - i: "MCP SDK: Go 用 MCP SDK"
+        - i: "DB: CloudSQL (PostgreSQL 18)"
+        - i: "DB スキーマ管理: Atlas"
+        - i: "ストレージ: GCS"
+        - i: "gRPC: buf + connect-go"
+        - i: "MCP 転送方式: Streamable HTTP (Cloud Run)"
+        - i: "IaC: Terraform"
+        - i: "CC Hooks: TypeScript（将来）"
+
+- i: "4+α層構成（ドメインバックエンド）"
+  c:
+    - i: "define/ — 型・インターフェース定義（契約）"
+      c:
+        - i: "他のどの層にも依存しない"
+        - i: "Go の interface と struct で契約を定義する"
+        - i: "外部パッケージへの依存は最小限（標準ライブラリ + uuid のみ推奨）"
+        - i: "ドメインエラー（センチネルエラー）をここで定義する"
+        - i: "proto 生成型（pb.go）を import しない。ドメイン純粋型のみ定義する"
+      n: "define/ は proto に依存しない。Proto ↔ Domain の変換は usecase/dto/ が担う"
+    - i: "usecase/ — ビジネスロジック"
+      c:
+        - i: "define/ にのみ依存する"
+        - i: "platform/ や infrastructure/ を直接参照しない"
+        - i: "define/ の interface を引数で受け取る（依存性注入）"
+        - i: "dto/ サブパッケージ — Proto ↔ Domain 変換層"
+          c:
+            - i: "Proto 生成型（pb.go）とドメイン純粋型（define/）の双方向変換を担う"
+            - i: "usecase/dto/convert.go に集約する"
+            - i: "entrypoint/ と interpoint/ がこの変換を利用する"
+            - i: "define/ は dto/ に依存しない（依存方向: dto → define, dto → proto generated）"
+          n: "Proto 生成型がドメイン層に漏れることを防ぐための橋渡し層"
+    - i: "infrastructure/ — 外部依存の実装"
+      c:
+        - i: "define/ の interface を実装する"
+        - i: "platform/ パッケージを利用して外部と接続する"
+        - i: "ビジネスロジックを含めない"
+        - i: "SQL は PostgreSQL 前提で記述する"
+        - i: "PII（個人識別情報）の暗号化/復号はこの層でのみ行う"
+          c:
+            - i: "define/ のエンティティは平文（通常の Go 型）で定義する"
+            - i: "usecase/ は平文のまま処理する"
+            - i: "infrastructure/repository/ で DB 書き込み時に暗号化、読み取り時に復号する"
+            - i: "暗号化方式: AES-256-GCM（値の暗号化）、HMAC-SHA256（検索用ハッシュ）"
+            - i: "DB カラム設計: BYTEA カラム（暗号化値）+ {field}_hash カラム（検索用ハッシュ）"
+          n: "PII の暗号化責務を infrastructure/ に閉じることで、usecase/ がセキュリティ詳細を知らずに済む"
+    - i: "entrypoint/ — ハンドラ・公開API（FE向け）"
+      c:
+        - i: "usecase/ を呼び出す"
+        - i: "infrastructure/ の具体実装を usecase/ に注入する（DI）"
+        - i: "MCP ツールハンドラ、gRPC ハンドラがここに位置する"
+        - i: "認証方式: Bearer token（JWT）"
+      n: "FE やクライアント向けの公開 API エンドポイント"
+    - i: "interpoint/ — サービス間内部API（ドメイン間通信が必要な場合に追加）"
+      c:
+        - i: "ドメイン間の内部通信ハンドラを配置する"
+        - i: "Connect-RPC handler として実装する"
+        - i: "認証方式: mTLS（サービス間認証）"
+        - i: "entrypoint/ と同様に usecase/ を呼び出す"
+        - i: "usecase/dto/ を使って Proto ↔ Domain 変換を行う"
+        - i: "作成タイミング: ドメイン間通信が必要になった時点で追加する（YAGNI）"
+      n: "entrypoint/ が FE 向け（Bearer token）、interpoint/ がサービス間（mTLS）。認証方式で分離する"
+    - i: "4+α層構成と scope の関係"
+      c:
+        - i: "define/, usecase/, infrastructure/, entrypoint/, interpoint/ — scope: domain（ドメイン固有）"
+        - i: "platform/ — scope: platform（外部サービスの抽象 interface + 実装）"
+        - i: "infrastructure/ は define/ の interface を実装し、platform/ の interface に依存する（DI で注入）"
+        - i: "usecase/ は platform/ や infrastructure/ を直接 import しない。define/ の interface のみ見る"
+        - i: "外部ライブラリ（database/sql, lib/pq 等）の direct import は platform/ のみに限定する"
+      n: "infrastructure/ が platform/ に依存するのは設計上許可されている。ただし import 方向は infrastructure → platform の一方向のみ"
+  n: "基本4層: entrypoint → usecase → define ← infrastructure → platform。interpoint/ はドメイン間通信が必要な場合のみ追加する5層目。小規模でも基本4層は省略しない"
+
+- i: "api-schema 運用（orphan branch 方式）"
+  c:
+    - i: "作成方針"
+      c:
+        - i: "UI が必要になり、バックエンドとの接続が必要になったとき"
+        - i: "ドメインをまたいでバックエンド間通信が必要になったとき"
+        - i: "上記いずれかの条件を満たした時点で orphan branch `api-schema` を作成する"
+        - i: "不要な段階では作成しない（YAGNI）"
+      n: "必要になるまで api-schema ブランチは存在しない。必要になった時点で初めて作成する"
+    - i: "概要"
+      c:
+        - i: "libs/api-schema/ は proto 定義の生成物を共有するための特殊ディレクトリ"
+        - i: "リポジトリ上では orphan branch `api-schema` として独立管理する"
+        - i: "feature branch の libs/api-schema/ には orphan branch からコピーした生成物を配置して利用する"
+      n: "FE と BE で担当者が分かれた場合に、proto 定義と生成コードを単一ソースとして共有するための仕組み"
+    - i: "orphan branch 構成"
+      c:
+        - i: "ブランチ名: api-schema（orphan — メインブランチとは独立した履歴）"
+        - i: "proto/ — 外部公開の .proto 定義"
+        - i: "proto-internal/ — ドメイン間 gRPC の .proto 定義"
+        - i: "generated/ — buf generate 結果の出力先"
+          c:
+            - i: "generated/go/ — Go connect-go コード"
+            - i: "generated/dart/ — Flutter 用（lib/ 配下構成 + pubspec.yaml 含む）"
+            - i: "generated/ts/ — TypeScript 用（barrel ファイル含む）"
+        - i: "buf.yaml, buf.gen.yaml — buf 設定"
+        - i: "gen-barrel/ — barrel ファイル生成ツール（demaetei リポジトリからコピー）"
+        - i: "gen-statics/ — 静的ファイル生成ツール（demaetei リポジトリからコピー）"
+      n: "orphan branch にはアプリコードを含めない。proto 定義と生成物のみ。generated/ 配下の言語別ディレクトリはプロジェクトの技術スタックに応じて作成する"
+    - i: "更新フロー（api-schema 担当者）"
+      c:
+        - i: "1. api-schema ブランチにチェックアウトする"
+        - i: "2. proto 定義（.proto）を編集する"
+        - i: "3. buf generate を実行する（generated/ に出力）"
+        - i: "4. go run gen-barrel で FE 用 barrel ファイルを生成する"
+        - i: "5. コミット・プッシュする"
+        - i: "6. 各担当者に通知する（proto 定義が変更された旨）"
+      n: "proto 変更は重量レビュー対象。通知後、各担当者は npm run api-schema:sync で同期する"
+    - i: "同期フロー（feature branch 担当者）"
+      c:
+        - i: "1. npm run api-schema:sync を実行する"
+        - i: "2. orphan branch の generated/ が libs/api-schema/ に上書きコピーされる"
+        - i: "3. 変更内容を確認し、コミットする"
+      n: "sync コマンドは tools/ に Node.js で実装する（Nx 前提）"
+    - i: "npm run api-schema:sync 実装"
+      c:
+        - i: "package.json の scripts に api-schema:sync を定義する"
+        - i: "実体は tools/ 配下の Node.js スクリプト"
+        - i: "処理: git fetch origin api-schema → 一時ディレクトリに checkout → libs/api-schema/ に上書きコピー → 一時ディレクトリ削除"
+        - i: "コピー対象: generated/ 配下（proto 定義自体は参照用にコピーしてもよい）"
+      n: "nx plugin にするか tools/ に置くかは要検討。基本は Node.js で実装"
+    - i: "参考実装"
+      c:
+        - i: "demaetei リポジトリに実績あり"
+        - i: "orphan branch 構成、gen-barrel、gen-statics の実装を参考にする"
+        - i: "必要になった時点で demaetei から構成とツールをコピーして適用する"
+    - i: "statics（エラー/ワーニング定義）"
+      c:
+        - i: "配置先: orphan branch の statics/{domain}/v1/"
+          c:
+            - i: "errors.yaml — エラー定義"
+            - i: "warnings.yaml — ワーニング定義（必要時）"
+        - i: "エラーコード命名: E_{DOMAIN_SHORT}_{ERROR_NAME}（例: E_FIN_INVALID_AMOUNT）"
+        - i: "番号帯管理: domain-codes.yaml でドメインごとの番号帯を定義する"
+          c:
+            - i: "例: finance: 1000-1999, habits: 2000-2999, relationships: 3000-3999"
+            - i: "番号帯の重複を禁止する"
+        - i: "生成ツール: tools/gen-statics/ で Go コードを自動生成する"
+        - i: "生成物: generated/go/{domain}/statics/ に出力"
+      n: "エラーコードの一元管理。FE/BE で共通のエラーコードを使用する"
+    - i: "gen-barrel が生成するファイル"
+      c:
+        - i: "Go: generated/go/ 配下の package ごとに barrel ファイル（全 export の re-export）"
+        - i: "Dart: generated/dart/lib/ 配下に barrel ファイル + pubspec.yaml"
+        - i: "TypeScript: generated/ts/ 配下に index.ts（barrel）"
+      n: "gen-barrel は buf generate 後に実行する。barrel ファイルにより import パスが安定する"
+    - i: "Proto 変更フロー（重量レビュー連動）"
+      c:
+        - i: "1. proto 定義を編集する"
+        - i: "2. buf generate を実行する"
+        - i: "3. go run gen-barrel を実行する"
+        - i: "4. 変更サマリ（追加/変更/削除フィールド）を作成する"
+        - i: "5. 後方互換性を確認する（フィールド削除・型変更は事前合意必須）"
+        - i: "6. コミット・プッシュする"
+        - i: "7. FE 担当者に通知する（変更サマリを添付）"
+        - i: "8. 各担当者が npm run api-schema:sync で同期する"
+      n: "Proto 変更は下流（FE, 他ドメイン）に波及する。後方互換性が壊れる場合は事前合意必須"
+    - i: "注意事項"
+      c:
+        - i: "feature branch で libs/api-schema/ を直接編集しない。常に orphan branch が single source of truth"
+        - i: "api-schema ブランチの proto 変更は design.yaml の「スキーマ変更時の重量レビュー」に従う"
+        - i: "gen-barrel, gen-statics は demaetei リポジトリから手動コピーする（npm パッケージ化は将来検討）"
+
+- i: "shared ライブラリ構成"
+  c:
+    - i: "define.go を先に書く（SDD）。全パッケージはこの interface に従う"
+    - i: "4層構成は適用しない。SDD（interface 先行）のみ適用する"
+    - i: "命名: {分類名}-{名前}-{言語}（例: test-runner-go）"
+    - i: "パッケージ内構成"
+      c:
+        - i: "define.go — public interface と型定義（必須）"
+        - i: "実装ファイル — define.go の interface を実装"
+        - i: "cmd/（CLI ツールがある場合）— validator 等のコマンドラインツール"
+  n: "ドメインより軽い構造。ただし interface 定義は省略しない"
+
+- i: "設計書フォーマット規約"
+  c:
+    - i: "YAML ファイル: i/c/n 記法（Workflowy 互換）を使用する"
+      c:
+        - i: "対象: def.yaml, rule.yaml, store.yaml, ref.yaml, schema.yaml, fn-*.yaml"
+        - i: "対象: docs/conventions/ 配下の全規約ファイル"
+    - i: "Markdown ファイル: 自由フォーマット（視認性重視）"
+      c:
+        - i: "対象: detaildesign.md — 実装レベルの詳細を記述するため可読性を優先する"
+        - i: "見出し階層（## Heading）を統一し、目次として機能させる"
+  n: "YAML は構造化、Markdown は可読性。使い分ける"
+
+- i: "testdata 配置規約"
+  c:
+    - i: "配置先: libs/domains/{domain}/backend/{layer}/testdata/"
+    - i: "ファイル形式: YAML（test-runner-go の YAML ローダーで読み込む）"
+    - i: "例"
+      c:
+        - i: "libs/domains/{domain}/backend/define/testdata/ — エンティティ・値オブジェクトのテストケース"
+        - i: "libs/domains/{domain}/backend/usecase/testdata/ — ユースケースのテストケース"
+        - i: "libs/domains/{domain}/backend/infrastructure/testdata/ — リポジトリのテストケース"
+    - i: "detaildesign.md のディレクトリ構成セクションに testdata パスを必ず記載する"
+  n: "テストデータは各層に配置する。層ごとにテストの関心事が異なるため、共有 testdata は作らない"
+
+- i: "Atlas 運用（DB スキーマ管理）"
+  c:
+    - i: "配置先: libs/platform/gcp-cloudsql-go/ 内"
+      c:
+        - i: "atlas.hcl — Atlas プロジェクト設定"
+        - i: "schema.hcl — 宣言的スキーマ定義（docs/domains/*/schema.yaml の DDL と対応）"
+        - i: "migrations/ — atlas migrate diff で生成されるマイグレーションファイル"
+      n: "Atlas は CloudSQL 接続情報に依存するため、CloudSQL クライアントと同居させる。接続設定を共有できる"
+    - i: "運用フロー"
+      c:
+        - i: "1. docs/domains/{domain}/schema.yaml で DDL を設計する"
+        - i: "2. schema.hcl に反映する（schema.yaml が設計の源泉、schema.hcl が実装）"
+        - i: "3. atlas migrate diff でマイグレーションファイルを生成する"
+        - i: "4. atlas migrate apply で適用する"
+      n: "schema.yaml（設計）→ schema.hcl（実装）→ migrations/（差分）の順。設計と実装の対応を保つ"
+    - i: "環境別の接続先"
+      c:
+        - i: "dev: ローカル Docker PostgreSQL または Cloud SQL Auth Proxy"
+        - i: "stg/prod: Cloud SQL Auth Proxy 経由"
+      n: "接続文字列は infra/environments/{env}/ の設定（dev は .env、stg/prod は Secret Manager）から取得する"
+    - i: "将来の分離方針"
+      c:
+        - i: "DB が複数になる、または Atlas 管理が肥大化した場合に libs/platform/atlas-cloudsql-go/ として独立パッケージ化を検討する"
+        - i: "小規模のうちは gcp-cloudsql-go/ に同居させる（YAGNI）"
+
+- i: "FE 設計・UI レビュー運用"
+  c:
+    - i: "基本方針"
+      c:
+        - i: "UI レビューは人間（設計者・クライアント）が行う。CC はレビューを代替しない"
+        - i: "CC は fn-*.yaml の ui セクションを入力として Figma デザイン生成・Mock アプリ実装を担う"
+        - i: "設計者は CC の出力（Figma / Mock）を確認し、設計の過不足・不整合に気づくための検証手段として活用する"
+        - i: "クライアントレビューで承認されたデザインをそのまま本実装に移行する。内部構造を理解した CC が生成しているため、余計なリファクタリングが発生しない"
+      n: "CC が設計から実装まで一気通貫で担うことで、デザインと実装の乖離を構造的に防止する"
+    - i: "3層構成"
+      c:
+        - i: "Figma — ビジュアルの single source of truth"
+          c:
+            - i: "CC が Figma MCP（use_figma）でデザインを作成・更新する"
+            - i: "クライアントは Figma 上でコメント・レビューする"
+            - i: "デザイントークン（色、spacing、typography）を Figma で定義する"
+            - i: "コンポーネント単位で設計し、再利用性を担保する"
+        - i: "Code Connect — 乖離防止の要"
+          c:
+            - i: "Figma コンポーネントとコードベースのコンポーネントを明示的にマッピングする"
+            - i: "CC が add_code_connect_map でマッピングを設定する"
+            - i: "Figma 上のコンポーネントをクリック → 対応するコードが参照可能"
+            - i: "Figma を更新したら Code Connect マッピングも必ず更新する"
+          n: "Code Connect が Figma とコードの紐付けを保証する。マッピングが切れた状態を放置しない"
+        - i: "Mock アプリ — インタラクション確認の場"
+          c:
+            - i: "apps/mock-{project}-next/ — Web 版 Mock（Next.js）"
+            - i: "apps/mock-{project}-flutter/ — Mobile 版 Mock（Flutter）"
+            - i: "Figma では確認できない動き（画面遷移、フォームバリデーション、ローディング）を確認する"
+            - i: "CC が get_design_context で Figma の最新デザインを取得し、Mock に反映する"
+          n: "Mock はプロジェクト技術スタックに応じて作成する。不要なら作成しない（YAGNI）"
+    - i: "UI 設計・レビューフロー"
+      c:
+        - i: "1. fn-*.yaml の ui セクションで画面仕様を設計する"
+        - i: "2. CC が Figma にデザインを生成する（use_figma）"
+        - i: "3. 設計者が Figma を確認し、設計の過不足・不整合を検出する"
+          n: "ここで設計にフィードバックが戻る。fn-*.yaml や def.yaml の修正が必要になることがある"
+        - i: "4. クライアントが Figma 上でレビュー・コメントする"
+        - i: "5. CC が Figma コメントを反映し、修正する"
+        - i: "6. Figma 承認後、Code Connect マッピングを設定する"
+        - i: "7. Mock アプリに実装する（必要な場合）"
+        - i: "8. クライアントがハンズオンレビューする"
+          c:
+            - i: "UI の見た目 → Figma と一致しているか確認"
+            - i: "インタラクション → 触って確認"
+            - i: "フィードバック → GitHub Issue（type:ui-review ラベル）"
+        - i: "9. フィードバックを分類する"
+          c:
+            - i: "デザイン変更 → ステップ 2 に戻る（Figma 修正）"
+            - i: "実装ズレ → Mock 修正（ステップ 7）"
+            - i: "承認 → 本実装に移行"
+        - i: "10. 本実装（Mock のコードをベースに libs/ + apps/ に統合）"
+      n: "設計者が CC の出力を検証し、クライアントが承認する二段階レビュー。CC は生成と修正を担う"
+    - i: "fn-*.yaml の ui セクション仕様"
+      c:
+        - i: "MCP ツール定義: inputSchema, outputSchema, description（CC 対話用）"
+        - i: "画面仕様（UI が必要な機能の場合）"
+          c:
+            - i: "画面構成: レイアウト、コンポーネント一覧、入力フォーム"
+            - i: "インタラクション: 画面遷移、バリデーション、ローディング、エラー表示"
+            - i: "使用デザイントークン: 色、spacing、typography の参照先"
+        - i: "Figma 参照（ui-design 完了後に追記される）"
+          c:
+            - i: "Figma ファイルキー、ノード ID"
+            - i: "Code Connect マッピング対象コンポーネント"
+      n: "fn-*.yaml の ui セクションが Figma 生成の入力となる。画面仕様が十分でないと Figma 出力がブレる"
+    - i: "デザイントークン同期"
+      c:
+        - i: "Figma 側: デザイントークン（colors, spacing, typography）を Variables で定義する"
+        - i: "フロントエンド側への同期"
+          c:
+            - i: "Web（Next.js）: src/styles/tokens.css（CSS variables）"
+            - i: "Mobile（Flutter）: lib/theme/design_tokens.dart（Dart class）"
+        - i: "同期タイミング: /imp ui-design 完了後に CC が get_design_context で取得し、token ファイルに反映する"
+        - i: "Mock アプリと本実装で token ファイルを共有する"
+        - i: "本実装コード内での token 値の直書き（hardcoded hex, px 値等）は禁止する"
+      n: "Figma が token の single source of truth。token 変更時は Figma → コードの方向で同期する"
+    - i: "Mock → 本実装の移行ガイド"
+      c:
+        - i: "Web（Next.js）の移行パス"
+          c:
+            - i: "Mock の components/ → 再利用可能コンポーネントとして整理"
+            - i: "Mock の state（useState/useContext）→ usecase/ 層のドメインロジックに分離"
+            - i: "Mock のモック API → api-schema の generated/ に置き換え"
+        - i: "Mobile（Flutter）の移行パス"
+          c:
+            - i: "Mock の widgets/ → 再利用可能 Widget として整理"
+            - i: "Mock の state management → usecase/ の値オブジェクトとして移行"
+            - i: "api-schema の generated/dart/ との統合"
+        - i: "Mock アプリの廃棄: 本実装承認後、1 ヶ月保管（バグ報告対応）→ その後削除"
+      n: "CC が設計から Mock まで一気通貫で生成しているため、移行時のリファクタリングは最小。ドメインロジック分離のみ注意"
+    - i: "PWA 実装ポジション"
+      c:
+        - i: "PWA は Next.js 実装時のオプション（@next/pwa）"
+        - i: "オフライン対応の段階"
+          c:
+            - i: "Level 1（デフォルト）: Service Worker キャッシュ + offline page"
+            - i: "Level 2（必要時）: IndexedDB でローカルデータ同期"
+            - i: "Level 3（OS 固有 API 必要）: Flutter への降格を検討"
+        - i: "Mock アプリでは PWA 機能を含めない（本実装時に追加）"
+      n: "PWA は Next.js の拡張であり、独立した技術選択ではない"
+    - i: "UI レビュー Issue テンプレート"
+      c:
+        - i: "必須項目"
+          c:
+            - i: "フィードバック分類: ビジュアル / インタラクション / パフォーマンス を選択"
+            - i: "スクリーンショット: 問題の状態"
+            - i: "期待値: 「こうなるべき」のスクリーンショットまたは説明"
+            - i: "該当画面パス: Mock アプリの URL path"
+            - i: "Figma リンク: 該当デザインの node URL"
+        - i: "任意項目: 理由（ユーザー調査、ビジネス要件等）"
+        - i: "ラベル: type:ui-review"
+        - i: "フィードバック経路: Figma コメント → ビジュアル即座指摘、GitHub Issue → 機能レベルのフィードバック"
+    - i: "Figma MCP ツール対応表"
+      c:
+        - i: "create_new_file — Figma ファイル新規作成"
+        - i: "use_figma — デザイン作成・編集（Plugin API で JS 実行）"
+        - i: "get_design_context — デザイン読み取り（コード + スクリーンショット）"
+        - i: "get_screenshot — スクリーンショット取得"
+        - i: "add_code_connect_map — Code Connect マッピング設定"
+        - i: "search_design_system — デザインシステム検索（既存コンポーネント再利用）"
+        - i: "generate_diagram — FigJam にフロー図生成（Mermaid.js）"
+      n: "CC が Figma MCP を使い、デザイン作成からコード生成まで一気通貫で実行できる"
+    - i: "FE 技術選定基準（優先順位順）"
+      c:
+        - i: "優先度1: Next.js（Web / PWA）— デフォルト"
+          c:
+            - i: "選定条件: 以下のすべてを満たす場合"
+              c:
+                - i: "OS 固有 API（カメラ直接制御、Bluetooth、HealthKit、バックグラウンド処理）を使用する画面が 0 件"
+                - i: "オフライン動作が不要、または Service Worker で対応可能な範囲（キャッシュ読み取りのみ）"
+                - i: "プッシュ通知が不要、または Web Push で許容可能"
+            - i: "PWA 化により Mobile でも利用可能。ストア配信が不要な場合はこれで十分"
+          n: "判断に迷ったらまず Next.js で構築する。Mobile 専用機能が必要になった時点で下位に降格する"
+        - i: "優先度2: Flutter — 両 OS 対応が必要かつ OS 固有依存が限定的な場合"
+          c:
+            - i: "選定条件: 以下のいずれかを満たし、かつ除外条件に該当しない場合"
+              c:
+                - i: "iOS / Android 両方のストア配信が必要"
+                - i: "OS 固有 API を使用する画面があるが、全画面の 30% 以下"
+                - i: "オフライン動作（ローカル DB 同期）が必要"
+            - i: "除外条件（以下のいずれかに該当したら優先度3へ）"
+              c:
+                - i: "OS 固有 API を使用する画面が全画面の 30% を超える"
+                - i: "AR / ウィジェット / 高度なバックグラウンド処理（位置追跡、音楽再生）が必要"
+                - i: "OS 標準 UI パターンの忠実な再現がビジネス要件（例: 医療、金融の規制対応）"
+                - i: "対象 OS が iOS のみ or Android のみ"
+          n: "30% は画面数ベースで判定する。例: 全20画面中、OS固有APIを使う画面が6画面以下なら Flutter"
+        - i: "優先度3: Swift / Kotlin — OS 固有機能への深い依存がある場合"
+          c:
+            - i: "選定条件: 以下のいずれかに該当する場合"
+              c:
+                - i: "OS 固有 API を使用する画面が全画面の 30% を超える"
+                - i: "AR、ウィジェット、高度なバックグラウンド処理が主要機能"
+                - i: "OS 標準 UI パターンの忠実な再現がビジネス要件"
+                - i: "対象 OS が片方のみ（iOS のみ → Swift、Android のみ → Kotlin）"
+            - i: "両 OS 必要な場合は Swift + Kotlin の並行開発となる。コスト倍増を許容できる場合のみ"
+          n: "ネイティブ選択は開発・保守コストが高い。定量的に Flutter の除外条件に該当する場合のみ採用する"
+        - i: "共通事項"
+          c:
+            - i: "デザイン: Figma + Code Connect（全選択肢で共通）"
+            - i: "BE 接続: api-schema の generated/ コードを利用"
+            - i: "判定タイミング: /des の Phase 1 ヒアリングで仮決定、detail-design 完了時に画面数を数値化して確定"
+            - i: "記録: DESIGN.md に判定根拠（全画面数、OS固有API使用画面数、選定理由）を記録する"
+            - i: "曖昧ケースの扱い"
+              c:
+                - i: "画面数は 30% 以下だが OS 固有機能の複雑度が高い（AR, Bluetooth 等）→ Swift/Kotlin 推奨"
+                - i: "画面数は 30% を超えるが使用 API がシンプル（位置情報のみ等）→ Flutter を検討可"
+                - i: "判断つかない場合 → Flutter で開始し、壁にぶつかったら該当画面のみネイティブモジュール化"
+
+- i: "世代管理パターン（マスタデータの有効期間管理）"
+  c:
+    - i: "対象: 料金表、ルール設定、権限定義など、有効期間を持つマスタデータ"
+    - i: "DB カラム設計"
+      c:
+        - i: "effective_from DATE — 有効開始日"
+        - i: "effective_to DATE — 有効終了日（NULL = 無期限）"
+        - i: "UNIQUE(entity_id, effective_from) 制約 — 同一エンティティの有効開始日重複を防止"
+    - i: "current_{table} ビュー"
+      c:
+        - i: "WHERE invalidated_at IS NULL AND effective_from <= CURRENT_DATE AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)"
+        - i: "ビュー名: current_{テーブル名}（例: current_pricing_plans）"
+      n: "現在有効なレコードのみを返すビュー。アプリケーションコードは基本的にこのビューを参照する"
+    - i: "Go embedding パターン"
+      c:
+        - i: "MasterFields 構造体: CommonFields を embedding + EffectiveFrom, EffectiveTo フィールド"
+        - i: "マスタデータのエンティティは MasterFields を embedding する"
+    - i: "バリデーションルール"
+      c:
+        - i: "effective_to < effective_from の拒否"
+        - i: "既存の有効期間と重複する世代の拒否"
+        - i: "未来世代の作成は許可する（事前設定用）"
+  n: "世代管理が必要になった時点で適用する（YAGNI）。単純な CRUD のみなら不要"
+
+- i: "認証・認可パターン（scope 認可）"
+  c:
+    - i: "JWT claims 設計"
+      c:
+        - i: "roles[] — ユーザーが持つ全ロール"
+        - i: "actingRole — 現在のアクティブロール（1つ）"
+        - i: "scopes[] — actingRole に紐づく操作権限"
+    - i: "認可チェックの配置"
+      c:
+        - i: "define/ 層: CanAccess{Entity}(role, operation) error 関数を定義する"
+        - i: "entrypoint/ 層: EndpointConfig で RPC ごとに AllowedRoles/Scopes/IsPublic を設定する"
+        - i: "interpoint/ 層: mTLS による相互認証（ロールチェック不要）"
+    - i: "shared/auth-identity-go/ — 認証共通パッケージ"
+      c:
+        - i: "AuthInterceptor: JWT 検証 + claims 抽出の Connect-RPC interceptor"
+        - i: "認可ミドルウェア: EndpointConfig に基づく scope チェック"
+    - i: "作成タイミング: 認証が必要になった時点で実装する（YAGNI）"
+  n: "認証・認可パターンが必要になるのは FE 接続時。MCP 専用フェーズでは不要"
+
+- i: "Docker Compose 戦略"
+  c:
+    - i: "3ファイル構成（BE/FE 並行開発時）"
+      c:
+        - i: "docker-compose.yml — ベース（postgres, エミュレータ等の依存サービス）"
+        - i: "docker-compose.dev.yml — BE 開発（ソースビルド, APP_MODE=development）"
+        - i: "docker-compose.fe.yml — FE 開発（AR イメージ, APP_MODE=stub, SEED_ON_STARTUP=true）"
+      n: "FE 開発者は BE のソースビルド不要。CI イメージをそのまま使う"
+    - i: "初期構成（MCP 専用フェーズ）"
+      c:
+        - i: "docker-compose.test.yaml のみで十分"
+        - i: "BE/FE 分離が必要になった時点で3ファイルに分割する"
+    - i: "使い方"
+      c:
+        - i: "BE: docker compose -f docker-compose.yml -f docker-compose.dev.yml up"
+        - i: "FE: docker compose -f docker-compose.yml -f docker-compose.fe.yml up"
+        - i: "テスト: docker compose -f docker-compose.test.yaml up"
+  n: "YAGNI: 最初は docker-compose.test.yaml のみ。FE が追加された時点で3ファイルに拡張する"
+
+- i: "スキーマ変更時の重量レビュー"
+  c:
+    - i: "スキーマ変更とは"
+      c:
+        - i: "define/ の interface 変更（メソッドの追加・削除・シグネチャ変更）"
+        - i: "define/ の型変更（フィールドの追加・削除・型変更）"
+        - i: "api-schema/ の proto 変更"
+        - i: "fn-*.yaml の interface セクション変更"
+    - i: "変更時に必須のレビュー"
+      c:
+        - i: "/rev basic-design — 基本設計の整合性"
+        - i: "/rev detail-design — 詳細設計の整合性"
+        - i: "/rev impl-define — define/ 実装の正しさ"
+        - i: "/rev cross-domain — ドメイン横断の整合性（他ドメインが参照している場合）"
+        - i: "/rev test-design — テスト定義の更新確認"
+        - i: "/rev ui-impact — Figma / UI への影響確認（fn-*.yaml の ui セクション再検証。UI がある場合のみ）"
+      n: "スキーマ変更は全レイヤーに影響する。個別機能レビュー + 個別ドメインレビューを設計レベルからすべてやり直す"
+    - i: "変更手順"
+      c:
+        - i: "1. fn-*.yaml の interface セクションを修正する"
+        - i: "2. def.yaml を修正する（必要な場合）"
+        - i: "3. detaildesign.md の型定義セクションを修正する"
+        - i: "4. 上記 5 種類のレビューを実施する"
+        - i: "5. define/ の Go コードを修正する"
+        - i: "6. 影響を受ける usecase/, infrastructure/, entrypoint/ を修正する"
+        - i: "7. テスト定義（testdata/*.yaml）を更新する"
+        - i: "8. /test validate を実行する"
+      n: "escalation.yaml の手順も併せて参照すること"
+
+- i: "フェーズ別 必読規約"
+  c:
+    - i: "basic-design（基本設計）"
+      c:
+        - i: "必読: design.yaml, naming.yaml"
+    - i: "detail-design（詳細設計）"
+      c:
+        - i: "必読: design.yaml, naming.yaml, testing.yaml"
+        - i: "任意: test-coverage.yaml"
+    - i: "impl — define/"
+      c:
+        - i: "必読: design.yaml, coding.yaml, naming.yaml"
+    - i: "impl — usecase/"
+      c:
+        - i: "必読: design.yaml, coding.yaml, testing.yaml"
+        - i: "任意: test-coverage.yaml"
+    - i: "impl — infrastructure/"
+      c:
+        - i: "必読: design.yaml, coding.yaml, testing.yaml"
+        - i: "任意: escalation.yaml"
+    - i: "impl — entrypoint/"
+      c:
+        - i: "必読: design.yaml, coding.yaml"
+    - i: "impl — interpoint/"
+      c:
+        - i: "必読: design.yaml, coding.yaml"
+      n: "ドメイン間通信がある場合のみ。entrypoint/ と同じ規約セットを読む"
+    - i: "impl — platform/"
+      c:
+        - i: "必読: design.yaml, coding.yaml"
+    - i: "impl — shared/"
+      c:
+        - i: "必読: design.yaml, coding.yaml, naming.yaml"
+    - i: "UI 設計（Figma + Mock）"
+      c:
+        - i: "必読: design.yaml（FE 設計・UI レビュー運用セクション）"
+    - i: "テスト作成"
+      c:
+        - i: "必読: testing.yaml, test-coverage.yaml"
+    - i: "レビュー実施"
+      c:
+        - i: "必読: review.yaml + ロール別必読ソース"
+    - i: "スキーマ変更時"
+      c:
+        - i: "必読: design.yaml, escalation.yaml, review.yaml"
+  n: "verify-cc-session FAIL 時は design.yaml を読み込み、フェーズに応じて追加規約を読む"
+
+- i: "セッション検証キー"
+  c:
+    - i: "REPLACE_WITH_GENERATED_KEY"
+  n: "CC が conventions/ を読み込み済みか確認するためのキー。/imp, /test, /rev の前処理で verify-cc-session コマンドに渡す"
+
+- i: "verify-cc-session ビルドフロー（/des が実行する）"
+  c:
+    - i: "1. /tmp/ にてランダムな SHA-256 トークンを発行する"
+    - i: "2. トークンを埋め込んだ Go アプリ（verify-cc-session）のソースを /tmp/ に生成する"
+    - i: "3. マルチアーキテクチャ・マルチプラットフォームでクロスビルドする"
+      c:
+        - i: "GOOS=darwin GOARCH=amd64"
+        - i: "GOOS=darwin GOARCH=arm64"
+        - i: "GOOS=linux GOARCH=amd64"
+        - i: "GOOS=linux GOARCH=arm64"
+    - i: "4. ビルド成果物を tools/verify-cc-session/ に配置する"
+    - i: "5. 発行したトークンを design.yaml のセッション検証キーに書き込む"
+    - i: "6. /tmp/ の一時ファイルを削除する"
+  n: "verify-cc-session は conventions/ 読み込み済みかを高速に検証するためのバイナリ。/des の Phase 3 で自動ビルドする"

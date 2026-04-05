@@ -1,0 +1,147 @@
+# def.yaml — test-runner-go interface 定義（SDD 契約）
+# libs/shared/test-runner-go の公開 interface
+# 要素記法: i(アイテム — 全要素の基本), c(子要素リスト — i の下にネスト), n(ノート — 補足説明)
+
+- i: "パッケージ概要"
+  c:
+    - i: "testdata/*.yaml を読み込み、テスト実行を支援する共通ユーティリティ"
+    - i: "全ドメインの全層から利用される"
+    - i: "Go module: github.com/aimglow/tsumugi/libs/shared/test-runner-go"
+  n: "ドメイン固有のロジックを含まない。汎用テスト基盤"
+
+- i: "公開 interface 一覧"
+  c:
+    - i: "TestCaseLoader"
+      c:
+        - i: |
+            type TestCaseLoader interface {
+                Load(path string) ([]TestCase, error)
+                LoadTyped[T any](path string) ([]TypedTestCase[T], error)
+            }
+        - i: "testdata/*.yaml を Go 構造体にパースする"
+        - i: "YAML の i/c/n 記法を解釈し、TestCase 構造体に変換する"
+      n: "全層で使用。テストの入口"
+    - i: "CoverageValidator"
+      c:
+        - i: |
+            type CoverageValidator interface {
+                Validate(config ValidateConfig) (ValidationResult, error)
+            }
+        - i: "testdata YAML と設計 YAML の整合性を検証する"
+        - i: "error/warning/info の三段階で結果を返す"
+      n: "テスト定義の網羅性を機械的に検証。/test validate から呼ばれる"
+    - i: "MockBuilder"
+      c:
+        - i: |
+            type MockBuilder interface {
+                BuildFromSpec(spec MockSpec) (MockSet, error)
+            }
+        - i: "YAML の mock セクションからモックオブジェクトを構築する"
+        - i: "success/error/skip の動作を解釈する"
+      n: "usecase 層の data-driven テストで使用"
+    - i: "SideEffectVerifier"
+      c:
+        - i: |
+            type SideEffectVerifier interface {
+                Verify(t *testing.T, spec SideEffectSpec, mocks MockSet)
+            }
+        - i: "YAML の side_effect セクションに基づき、モック呼び出しを検証する"
+        - i: "called_once, called:{N}, not_called, called_with:{pattern} を解釈する"
+      n: "usecase 層の副作用検証で使用"
+    - i: "WantAsserter"
+      c:
+        - i: |
+            type WantAsserter interface {
+                Assert(t *testing.T, got any, err error, spec WantSpec)
+            }
+        - i: "YAML の want セクションに基づき、結果を検証する"
+        - i: "null, not_empty, any, 具体値, エラー変数名 を解釈する"
+      n: "全層で使用。期待値の検証"
+    - i: "DBHelper"
+      c:
+        - i: |
+            type DBHelper interface {
+                Setup(ctx context.Context, specs []SetupSpec) error
+                Teardown(ctx context.Context) error
+                DB() DB
+            }
+        - i: "YAML の setup セクションに基づき、テスト用データを投入する"
+        - i: "テスト後にクリーンアップする"
+      n: "infrastructure 層の integration テストで使用。platform/gcp-cloudsql-go の DB interface に依存"
+
+- i: "公開型一覧"
+  c:
+    - i: "TestCase"
+      c:
+        - i: "Name: string — テストケース名"
+        - i: "Strategy: Strategy — data-driven | integration | e2e"
+        - i: "Requires: string — none | postgres | gcs | mcp-server"
+        - i: "Input: map[string]any — 入力データ"
+        - i: "Want: WantSpec — 期待結果"
+        - i: "Mock: MockSpec — モック動作定義"
+        - i: "Setup: []SetupSpec — 事前データ投入"
+        - i: "SideEffect: SideEffectSpec — 副作用検証"
+        - i: "Note: string — 補足説明"
+    - i: "TypedTestCase[T]"
+      c:
+        - i: "TestCase を埋め込み、Input を T 型にデシリアライズした型付きバージョン"
+        - i: "TypedInput: T — 型付き入力データ"
+      n: "Go generics を使用。usecase テストで type-safe に入力を扱える"
+    - i: "Strategy"
+      c:
+        - i: "StrategyDataDriven = 'data-driven'"
+        - i: "StrategyIntegration = 'integration'"
+        - i: "StrategyE2E = 'e2e'"
+    - i: "WantSpec"
+      c:
+        - i: "Error: *string — null | エラー変数名"
+        - i: "Fields: map[string]WantValue — フィールド名→期待値"
+    - i: "WantValue"
+      c:
+        - i: "Null — nil チェック"
+        - i: "NotEmpty — 空でないことをチェック"
+        - i: "Any — チェックスキップ"
+        - i: "Exact(v any) — 完全一致チェック"
+    - i: "MockSpec"
+      c:
+        - i: "Behaviors: map[string]MockBehavior — '{Interface}.{Method}' → 動作"
+    - i: "MockBehavior"
+      c:
+        - i: "Success — エラーなし"
+        - i: "Error(msg string) — 指定エラーを返す"
+        - i: "Skip — 呼ばれない想定"
+    - i: "MockSet"
+      c:
+        - i: "Get(name string) any — 名前でモックを取得"
+        - i: "Calls(name string) []MockCall — 呼び出し履歴"
+    - i: "SideEffectSpec"
+      c:
+        - i: "Expectations: map[string]SideEffectExpectation"
+    - i: "SideEffectExpectation"
+      c:
+        - i: "CalledOnce — 1回呼び出し"
+        - i: "Called(n int) — N回呼び出し"
+        - i: "NotCalled — 未呼び出し"
+        - i: "CalledWith(pattern string) — 引数パターン一致"
+    - i: "SetupSpec"
+      c:
+        - i: "Operation: string — INSERT | UPLOAD"
+        - i: "Target: string — テーブル名 | パス"
+        - i: "Data: map[string]any — 投入データ"
+    - i: "ValidateConfig"
+      c:
+        - i: "TestdataDir: string — testdata/ ディレクトリパス"
+        - i: "DefPath: string — def.yaml パス"
+        - i: "RulePath: string — rule.yaml パス"
+        - i: "FnPaths: []string — fn-*.yaml パス一覧"
+    - i: "ValidationResult"
+      c:
+        - i: "Errors: []ValidationIssue"
+        - i: "Warnings: []ValidationIssue"
+        - i: "Infos: []ValidationIssue"
+        - i: "HasErrors() bool"
+        - i: "String() string — 整形出力"
+    - i: "ValidationIssue"
+      c:
+        - i: "File: string — 対象ファイル"
+        - i: "Message: string — 指摘内容"

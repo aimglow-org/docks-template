@@ -1,0 +1,77 @@
+# coding.yaml — Go コーディング規約
+# Go コードの書き方に特化した規約。設計方針は design.yaml を参照
+# 要素記法: i(アイテム — 全要素の基本), c(子要素リスト — i の下にネスト), n(ノート — 補足説明)
+
+- i: "エラーハンドリング"
+  c:
+    - i: "エラーは必ず処理する。_ で握りつぶさない"
+    - i: "エラーは fmt.Errorf(\"%w\", err) でラップして返す"
+    - i: "センチネルエラーは define/ で定義する"
+    - i: "errors.Is() / errors.As() で判定可能な形式にする"
+
+- i: "構造体"
+  c:
+    - i: "フィールドは意味のある順序で並べる（ID, 名前, 属性, タイムスタンプ）"
+    - i: "JSON タグは snake_case"
+    - i: "ゼロ値が有用な設計にする（コンストラクタなしでも安全に使える）"
+
+- i: "コメント"
+  c:
+    - i: "公開シンボルには GoDoc コメントを書く"
+    - i: "ロジックが自明でない箇所にのみコメント。過剰に書かない"
+    - i: "TODO コメントには Issue 番号を付ける"
+
+- i: "import"
+  c:
+    - i: "標準ライブラリ / 外部パッケージ / 内部パッケージ の3グループに分ける"
+    - i: "goimports で自動整形する"
+    - i: "ドット import（. \"pkg\"）は使わない"
+
+- i: "関数"
+  c:
+    - i: "1関数の行数は 50 行を目安とする。超えたら分割を検討する"
+    - i: "引数が 4 つ以上になったら構造体にまとめる"
+    - i: "context.Context は常に第1引数にする"
+    - i: "戻り値のエラーは常に最後にする"
+
+- i: "テストコード"
+  c:
+    - i: "テストファイルは対象ファイルと同じディレクトリに置く"
+    - i: "ファイル名: {対象}_test.go"
+    - i: "テスト関数名: Test{関数名}（サブテストで YAML のケース名を使用）"
+    - i: "テーブル駆動テスト: test-runner-go の YAML ローダーを使用する"
+    - i: "モック: ドメインの _test.go 内に手書きする"
+  n: "テストの書き方の規約。テスト方針は testing.yaml を参照"
+
+- i: "PII 暗号化"
+  c:
+    - i: "暗号化/復号の責務は infrastructure/repository/ に閉じる"
+    - i: "define/ のエンティティは平文で定義する。暗号化の存在を知らない"
+    - i: "usecase/ は平文のまま処理する"
+    - i: "暗号化方式"
+      c:
+        - i: "値の暗号化: AES-256-GCM"
+        - i: "検索用ハッシュ: HMAC-SHA256"
+    - i: "DB カラム: BYTEA（暗号化値）+ {field}_hash（検索用ハッシュ）"
+    - i: "暗号鍵管理: Secret Manager から取得。コードにハードコードしない"
+  n: "PII が不要なドメインでは適用しない。必要になった時点で infrastructure/ に実装する"
+
+- i: "usecase/dto/ パッケージ"
+  c:
+    - i: "Proto 生成型（pb.go）とドメイン純粋型（define/）の双方向変換を配置する"
+    - i: "ファイル名: convert.go（または convert_{entity}.go）"
+    - i: "関数命名: ToProto{Type}(domain) *pb.Type, FromProto{Type}(proto) domain"
+    - i: "entrypoint/ と interpoint/ がこの変換を利用する"
+  n: "Proto 変換が不要なフェーズ（MCP 専用等）では作成しない（YAGNI）"
+
+- i: "禁止事項"
+  c:
+    - i: "usecase/ から platform/ を直接 import しない"
+    - i: "define/ にビジネスロジックを書かない（型と契約のみ）"
+    - i: "define/ から proto 生成型（pb.go）を import しない"
+    - i: "infrastructure/ にビジネスルールを書かない（接続と変換のみ）"
+    - i: "entrypoint/ にビジネスロジックを書かない（組み立てと呼び出しのみ）"
+    - i: "4層構成を省略しない（小規模でも）"
+    - i: "init() 関数を使わない（DI で解決する）"
+    - i: "グローバル変数を使わない（define/ の const と var ErrXxx を除く）"
+  n: "4層構成のルールは design.yaml で定義。ここではコードレベルの禁止事項を記述"

@@ -1,0 +1,374 @@
+# testing.yaml — テスト規約
+# TDD に基づく紬プロジェクトのテストルール
+# 要素記法: i(アイテム — 全要素の基本), c(子要素リスト — i の下にネスト), n(ノート — 補足説明)
+
+- i: "テストファースト原則"
+  c:
+    - i: "設計完了後、実装より先にテストデータ（testdata/*.yaml）を作成する"
+    - i: "テストデータが /rev でレビューされてから実装に入る"
+    - i: "テストが通ることを実装の完了条件とする"
+  n: "TDD: テストデータ定義 → テストコード → 実装コード の順"
+
+- i: "テスト3層管理（test.spec.md → YAML → Go テストランナー）"
+  c:
+    - i: "test.spec.md — 人間可読のテスト仕様（SSoT）"
+      c:
+        - i: "配置先: docs/domains/{domain}/.task/ または detaildesign.md のテスト方針セクション"
+        - i: "内容: テストケース一覧、テスト戦略、期待結果の自然言語記述"
+        - i: "作成タイミング: /test design の最初に作成する"
+        - i: "/rev test-design でレビュー対象になる"
+      n: "test.spec.md が「何をテストするか」の源泉。YAML は「どうテストするか」の実装"
+    - i: "testdata/*.yaml — 機械可読のテストデータ"
+      c:
+        - i: "test.spec.md のケースを YAML 形式に変換する"
+        - i: "test-runner-go の YAML ローダーが解釈可能な形式"
+      n: "test.spec.md → YAML の変換は CC が行う"
+    - i: "Go テストランナー — テスト実行"
+      c:
+        - i: "YAML を読み込み、テストを実行する"
+        - i: "test-runner-go のコンポーネントを使用する"
+    - i: "3層同期ルール"
+      c:
+        - i: "test.spec.md を変更したら YAML も更新する"
+        - i: "YAML を変更したら test.spec.md との整合性を確認する"
+        - i: "/rev の ALN（Alignment）チェックで3層の同期を検証する"
+  n: "3層の同期が崩れるとテストの���頼性が低下する。/rev で検証する"
+
+- i: "テスト��ータ YAML のフォ���マット"
+  c:
+    - i: "設計書 YAML: i/c/n 記法（Workflowy 互換）"
+    - i: "テ��トデータ YAML: flat 形式も許容する"
+      c:
+        - i: "flat 形式: functions/cases/input/want の階層構造"
+        - i: "Go パーサーとの親和性が高い"
+        - i: "既存の i/c/n 記法も引き続き使用可能"
+      n: "テストデータに限り flat 形式を標準とすることを推奨。Go テストランナーのパース実装が簡潔になる"
+  n: "規約 YAML は i/c/n 記法を維持。テストデータ YAML の��� flat 形式を許容する"
+
+- i: "テストデータ構造（testdata/）"
+  c:
+    - i: "配置先"
+      c:
+        - i: "libs/domains/{domain}/backend/{layer}/testdata/"
+        - i: "例: libs/domains/dialogue/backend/usecase/testdata/"
+    - i: "ファイル命名"
+      c:
+        - i: "{対象関数名}_test.yaml"
+        - i: "例: save_dialogue_test.yaml, search_dialogue_test.yaml"
+    - i: "YAML 構造（Workflowy 互換）"
+      c:
+        - i: "各テストケース"
+          c:
+            - i: "c: テストケース名（日本語可）"
+            - i: "children"
+              c:
+                - i: "strategy（テスト戦略）"
+                  c:
+                    - i: "type: data-driven | integration | e2e"
+                    - i: "requires: none | postgres | gcs | mcp-server"
+                  n: "data-driven は runner が機械的に処理。integration/e2e は CC がテストコード生成"
+                - i: "input（入力データ）"
+                  c:
+                    - i: "キー: 値 の形式で入力パラメータを定義"
+                - i: "mock（モック動作定義）"
+                  c:
+                    - i: "{Interface名}.{Method名}: success | error:{エラー内容} | skip"
+                  n: "data-driven のみ。runner がモックをセットアップする"
+                - i: "setup（事前データ投入）"
+                  c:
+                    - i: "INSERT {table}: {データ}"
+                    - i: "UPLOAD {path}: {データ}"
+                  n: "integration のみ。DB/GCS への事前データ投入"
+                - i: "want（期待結果）"
+                  c:
+                    - i: "error: null | {エラー変数名}"
+                    - i: "フィールド名: 値 | not_empty | any"
+                - i: "side_effect（副作用の検証）"
+                  c:
+                    - i: "{Interface名}.{Method名}: called_with:{引数パターン}"
+                    - i: "{Interface名}.{Method名}: not_called"
+                  n: "モックの呼び出し検証。data-driven で使用"
+            - i: "n: テストケースの補足説明"
+
+- i: "テストカテゴリと層別方針"
+  c:
+    - i: "define/ — 値オブジェクトテスト"
+      c:
+        - i: "strategy: data-driven"
+        - i: "requires: none"
+        - i: "対象: バリデーションメソッド（IsValid 等）"
+        - i: "mock: 不要"
+        - i: "runner が YAML を読み込み、入力→期待結果を機械的に検証する"
+      n: "最もシンプル。純粋な入力→出力テスト"
+    - i: "usecase/ — ビジネスロジックテスト"
+      c:
+        - i: "strategy: data-driven"
+        - i: "requires: none"
+        - i: "対象: ユースケースの Execute メソッド"
+        - i: "mock: define/ の interface をモック化"
+        - i: "runner が YAML の mock 定義に従ってモックをセットアップし、Execute を呼び、want を検証する"
+        - i: "side_effect でモックの呼び出しパターンも検証する"
+      n: "最も重要なテスト対象。正常系・異常系・境界値を網羅する"
+    - i: "infrastructure/ — 統合テスト"
+      c:
+        - i: "strategy: integration"
+        - i: "requires: postgres | gcs"
+        - i: "対象: Repository 実装の SQL 実行結果"
+        - i: "setup: テスト用データの投入（YAML で定義）"
+        - i: "CC が YAML を読み、setup/teardown を含むテストコードを生成する"
+        - i: "生成されたコードは CI/CD でそのまま実行可能"
+      n: "実DB接続が必要。CI では Docker Compose で PostgreSQL を起動する"
+    - i: "entrypoint/ — MCP ツールテスト"
+      c:
+        - i: "strategy: e2e"
+        - i: "requires: mcp-server"
+        - i: "対象: MCP リクエスト → レスポンスの変換"
+        - i: "input: MCP ツールの JSON パラメータ"
+        - i: "want: MCP レスポンスの JSON"
+        - i: "CC が YAML を読み、MCP サーバーのテストコードを生成する"
+    - i: "platform/ — 接続テスト"
+      c:
+        - i: "strategy: integration"
+        - i: "requires: postgres | gcs"
+        - i: "対象: DB/Storage interface の実装"
+        - i: "CC がテストコードを生成する"
+
+- i: "DB 環境方針"
+  c:
+    - i: "テストは Docker の PostgreSQL 18 で完結させる。GCP CloudSQL への接続はデプロイ後の動作確認のみ"
+    - i: "PostgreSQL バージョン: 18（GCP CloudSQL 対応済み）"
+    - i: "理由"
+      c:
+        - i: "CI/CD で GCP 認証を通すのは設定コストが高い"
+        - i: "テストのたびに CloudSQL に接続すると遅い・コスト発生"
+        - i: "Docker の PostgreSQL は CloudSQL と同じエンジンなので SQL 互換性は問題ない"
+
+- i: "テスト実行環境"
+  c:
+    - i: "CC web インスタンス"
+      c:
+        - i: "Docker デーモンなし。コンテナ実行不可"
+        - i: "data-driven テスト: 実行可能（DB 不要）"
+        - i: "integration テスト: 実行不可（DB 必要）"
+        - i: "用途: 設計・コード記述・data-driven テスト・/test validate"
+      n: "CC web では DB 不要な作業に集中する。統合テストはローカル PC または CI で実行"
+    - i: "ローカル PC"
+      c:
+        - i: "data-driven: go test ./... で実行"
+        - i: "integration: Docker Compose で PostgreSQL 18 + GCS エミュレータを起動"
+        - i: "e2e: MCP サーバーをローカル起動してテスト"
+    - i: "CI/CD（GitHub Actions）"
+      c:
+        - i: "data-driven: そのまま実行"
+        - i: "integration: サービスコンテナ（postgres:18）を使用"
+        - i: "e2e: テスト用の MCP サーバーをビルド・起動して実行"
+    - i: "テストタグ"
+      c:
+        - i: "//go:build integration — 統合テスト用ビルドタグ"
+        - i: "//go:build e2e — E2E テスト用ビルドタグ"
+        - i: "タグなし — data-driven テスト（常に実行）"
+      n: "go test ./... はタグなしのテストのみ実行。統合テストは go test -tags=integration ./..."
+    - i: "Docker Compose 構成"
+      c:
+        - i: "PostgreSQL 18: port 5433（ホスト衝突回避）"
+        - i: "GCS エミュレータ: fake-gcs-server（必要時）"
+        - i: "配置先: docker-compose.test.yaml"
+      n: "実装タスクとして Docker Compose ファイルを作成する"
+
+- i: "テスト用共通パッケージ"
+  c:
+    - i: "libs/shared/testutil/"
+      c:
+        - i: "yamlloader.go"
+          c:
+            - i: "testdata/*.yaml を Go の構造体にパースする"
+            - i: "LoadTestCases[T](path string) ([]TestCase[T], error)"
+            - i: "TestCase 構造体: Name, Input, Want, Mock, SideEffect"
+          n: "data-driven テストの基盤。全ドメイン共通で使用する"
+        - i: "mockbuilder.go"
+          c:
+            - i: "YAML の mock 定義からモックオブジェクトをセットアップする"
+            - i: "BuildMock[T](spec MockSpec) T"
+          n: "usecase テストで使用。mock 定義を解釈してモックを生成する"
+        - i: "dbhelper.go"
+          c:
+            - i: "テスト用 DB 接続の確立と teardown"
+            - i: "setup データの投入（YAML の setup セクションを実行）"
+          n: "integration テストで使用"
+    - i: "libs/shared/testutil/validator/"
+      c:
+        - i: "validator.go"
+          c:
+            - i: "testdata YAML の網羅性を検証する"
+            - i: "Validate(testdataPath, defPath, rulePath, fnPaths []string) ValidationResult"
+            - i: "def.yaml, rule.yaml, fn-*.yaml を読み込み、テスト定義との整合性を検証する"
+          n: "設計 YAML とテスト YAML の整合性チェックが本質"
+        - i: "rules.go"
+          c:
+            - i: "必須検証（error）: 必須パラメータの欠落異常系、定義済みエラーのカバー、正常系の存在"
+            - i: "推奨検証（warning）: 境界値、配列パターン、side_effect、準正常系、障害系"
+            - i: "情報提供（info）: ケース内訳、未カバー enum 値"
+          n: "test-coverage.yaml の validator 検証ルールを実装する"
+        - i: "result.go"
+          c:
+            - i: "ValidationResult 構造体: Errors, Warnings, Infos"
+            - i: "HasErrors() bool — error が 1 件以上あれば true"
+            - i: "String() string — 整形された出力"
+          n: "error があれば実装に進めない。warning は CC が判断して対応する"
+        - i: "層別検証"
+          c:
+            - i: "define/: enum 値の全カバー確認"
+            - i: "usecase/: 各 fn-*.yaml のエラーケースとの対応確認"
+            - i: "infrastructure/: SQL インジェクション用テスト文字列の存在確認"
+            - i: "entrypoint/: MCP パラメータ変換の正常/異常の存在確認"
+      n: "validator は CLI としても実行可能: go run ./libs/shared/testutil/validator/cmd/ ..."
+
+- i: "テスト品質の三段階"
+  c:
+    - i: "Level 1: validator PASS（機械的検証通過）"
+      c:
+        - i: "必須ケースが揃っている"
+        - i: "設計 YAML との整合性がある"
+        - i: "最低限の品質。これがないと実装に進めない"
+    - i: "Level 2: /rev test-design PASS（レビュー通過）"
+      c:
+        - i: "test-engineer が境界値やエッジケースの妥当性を判断"
+        - i: "ddd-auditor がビジネスルールのカバレッジを確認"
+        - i: "security-analyst がセキュリティ関連テストの存在を確認"
+        - i: "推奨。warning への対応はここで判断する"
+    - i: "Level 3: 全テスト PASS + /rev full PASS"
+      c:
+        - i: "実装完了後の最終品質確認"
+        - i: "テストケースの妥当性と実装の正しさの両方が確認済み"
+
+- i: "Go テスト規約"
+  c:
+    - i: "ファイル配置"
+      c:
+        - i: "テストファイルは対象ファイルと同じディレクトリに置く"
+        - i: "ファイル名: {対象}_test.go"
+        - i: "テストデータ: testdata/{対象}_test.yaml"
+    - i: "テスト関数名"
+      c:
+        - i: "Test{関数名} の形式（サブテストで YAML のケース名を使用）"
+        - i: "例: TestSaveDialogue → t.Run(testCase.Name, ...)"
+    - i: "data-driven テストのパターン"
+      c:
+        - i: |
+            func TestSaveDialogue(t *testing.T) {
+                cases := testutil.LoadTestCases[SaveDialogueTestCase]("testdata/save_dialogue_test.yaml")
+                for _, tc := range cases {
+                    t.Run(tc.Name, func(t *testing.T) {
+                        // mock setup from tc.Mock
+                        // execute
+                        // assert tc.Want
+                        // verify tc.SideEffect
+                    })
+                }
+            }
+      n: "YAML からテストケースをロードし、テーブル駆動で回す"
+
+# ==================================================
+# test-runner-go 対応状況と拡張方針
+# ==================================================
+
+- i: "test-runner-go 対応状況"
+  c:
+    - i: "対応済み（実装する）"
+      c:
+        - i: "TestCaseLoader"
+          c:
+            - i: "testdata/*.yaml の読み込みとパース"
+            - i: "Generics による型付きテストケースのデシリアライズ"
+            - i: "i/c/n 記法（Workflowy 互換）の解釈"
+          n: "全層で使用。テスト基盤の入口"
+        - i: "CoverageValidator"
+          c:
+            - i: "testdata と設計 YAML の整合性検証"
+            - i: "error/warning/info 三段階の結果出力"
+            - i: "CLI ツール（cmd/validate/）"
+          n: "テスト定義時に /test validate から使用"
+        - i: "MockBuilder"
+          c:
+            - i: "YAML の mock セクションから振る舞い関数を生成"
+            - i: "success/error/skip の解釈"
+          n: "usecase 層の data-driven テストで使用"
+        - i: "SideEffectVerifier"
+          c:
+            - i: "モック呼び出し回数・引数パターンの検証"
+            - i: "called_once/called:{N}/not_called/called_with:{pattern}"
+          n: "usecase 層の副作用検証で使用"
+        - i: "WantAsserter"
+          c:
+            - i: "null/not_empty/any/具体値/エラー変数名の期待値検証"
+            - i: "ネストフィールドアクセス（dialogues[0].session_id）"
+          n: "全層で使用"
+        - i: "DBHelper"
+          c:
+            - i: "テスト用 DB 接続、setup データ投入、トランザクションロールバック"
+          n: "infrastructure 層の統合テストで使用"
+
+    - i: "未対応（発生時に対応する）"
+      c:
+        - i: "時刻制御（Clock）"
+          c:
+            - i: "状況: time.Now() に依存するテストで時刻を固定できない"
+            - i: "影響: dialogue の CreatedAt テストが不安定になる"
+            - i: "対応方法: 各ドメインの define/ に Clock interface を定義し、DI で注入する"
+            - i: "test-runner-go への拡張: 不要（ドメイン固有の関心事）"
+          n: "dialogue 実装で即対応する。define/clock.go として追加"
+        - i: "外部 API モック（HTTPRecorder）"
+          c:
+            - i: "状況: 外部 API（OpenAI 等）のリクエスト/レスポンスを記録・再生したい"
+            - i: "影響: api-{name}-go の統合テストが書けない"
+            - i: "対応方法: net/http/httptest で十分な場合はそれを使う"
+            - i: "test-runner-go への拡張提案: HTTPRecorder interface を追加し、YAML で request/response ペアを定義可能にする。責務分離の観点で妥当（HTTP テストは汎用）"
+          n: "Phase 3 以降（外部 API 連携時）に対応"
+        - i: "MCP プロトコルテスト"
+          c:
+            - i: "状況: MCP Streamable HTTP のリクエスト/レスポンスをテストしたい"
+            - i: "影響: entrypoint/ の E2E テストが書けない"
+            - i: "対応方法: Go MCP SDK のテストヘルパーを使用する"
+            - i: "test-runner-go への拡張提案: 不要（MCP SDK が提供するテストユーティリティを使う）"
+          n: "entrypoint 実装時に Go MCP SDK のテスト機能を調査"
+        - i: "ファイルシステム操作"
+          c:
+            - i: "状況: ファイル生成・読み込みのテストが必要"
+            - i: "対応方法: testing.TempDir() + os.DirFS で十分"
+            - i: "test-runner-go への拡張提案: 不要（Go 標準ライブラリで対応可能）"
+        - i: "並行処理テスト"
+          c:
+            - i: "状況: goroutine のレースコンディション検出"
+            - i: "対応方法: go test -race フラグで十分"
+            - i: "test-runner-go への拡張提案: 不要"
+        - i: "トランザクション境界テスト"
+          c:
+            - i: "状況: コミット/ロールバックの挙動を検証したい"
+            - i: "対応方法: DBHelper のトランザクションロールバック機能で基本対応"
+            - i: "test-runner-go への拡張提案: DBHelper に BeginTx/CommitTx/RollbackTx を追加。責務分離の観点で妥当（DB テストは汎用）"
+          n: "infrastructure 実装時に DBHelper の現機能で不足するか判断"
+        - i: "イベント駆動テスト"
+          c:
+            - i: "状況: ドメインイベント発行/購読のテスト"
+            - i: "対応方法: イベントバスの interface をモック化"
+            - i: "test-runner-go への拡張提案: EventRecorder interface 追加。ただしイベント駆動設計が確定してから"
+          n: "将来のドメイン間連携時に必要になる可能性"
+
+- i: "拡張提案の判断基準"
+  c:
+    - i: "test-runner-go に追加すべき場合"
+      c:
+        - i: "複数ドメインで同じテストパターンが繰り返される"
+        - i: "YAML 定義で表現可能な汎用的な仕組み"
+        - i: "ドメイン固有の型に依存しない"
+    - i: "ドメイン側で対応すべき場合"
+      c:
+        - i: "ドメイン固有の interface に依存する（Clock 等）"
+        - i: "特定の外部サービスに依存する"
+        - i: "1つのドメインでしか使わない"
+    - i: "Go 標準ライブラリで十分な場合"
+      c:
+        - i: "testing.TempDir(), httptest, -race フラグ等"
+        - i: "専用ツールを作る価値がない"
+  n: "迷ったら「2ドメイン以上で使うか？」で判断する。1ドメインならドメイン側で対応"
+
