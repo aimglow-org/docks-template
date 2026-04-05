@@ -1,0 +1,36 @@
+# def.yaml — design-system-next interface 定義（SDD 契約）
+# libs/shared/design-system-next の公開コンポーネント契約
+# 要素記法: i(アイテム — 全要素の基本), c(子要素リスト — i の下にネスト), n(ノート — 補足説明)
+#
+# このファイルはテンプレートのスケルトン。
+# /des 実行時にプロジェクトのデザイントークンとコンポーネントで具体化する。
+
+- i: "パッケージ概要"
+  c:
+    - i: "Figma 同期のデザイントークンと、プロジェクト共通の UI コンポーネント"
+    - i: "全ドメインの frontend-next/ から参照される"
+    - i: "ドメインロジックを一切持たない"
+  n: "Design System は FE 3層構成の Layer 1。最も安定した層"
+
+- i: "トークン定義"
+  c:
+    - i: "tokens/colors.css — カラートークン（CSS Variables）"
+      n: "Figma Variables から同期。直接編集しない"
+    - i: "tokens/typography.css — タイポグラフィトークン"
+    - i: "tokens/spacing.css — スペーシングトークン"
+  n: "Figma が single source of truth。/imp の ui-design 後に CC が同期する"
+
+- i: "primitives/ — 最小単位コンポーネント契約"
+  c:
+    - i: "（プロジェクト初期化時に定義する）"
+  n: "Button, Input, Icon, Text 等。props と variants を定義する"
+
+- i: "composites/ — 複合コンポーネント契約"
+  c:
+    - i: "（プロジェクト初期化時に定義する）"
+  n: "Form, Card, Modal, DataTable 等。primitives の組み合わせ。汎用的なもののみ"
+
+- i: "layouts/ — レイアウトパターン契約"
+  c:
+    - i: "（プロジェクト初期化時に定義する）"
+  n: "Sidebar, Stack, Grid 等。ページの骨格パターン。中身に依存しない"

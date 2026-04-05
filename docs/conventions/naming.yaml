@@ -30,14 +30,15 @@
         - i: "例: {domain-a}, {domain-b}（/des で定義したドメイン名）"
         - i: "バックエンド"
           c:
-            - i: "libs/domains/{domain}/backend/ — Go 実装"
+            - i: "libs/domains/{domain}/backend-{tech}/ — Go の場合 backend-go/"
             - i: "内部: define/, usecase/, infrastructure/, entrypoint/"
         - i: "フロントエンド"
           c:
-            - i: "libs/domains/{domain}/feature-{機能名}-{言語}/"
-            - i: "例: libs/domains/finance/feature-ledger-next/"
-            - i: "例: libs/domains/habits/feature-tracker-flutter/"
-          n: "同一ドメインに複数プラットフォームの実装が共存できる"
+            - i: "libs/domains/{domain}/frontend-{tech}/"
+            - i: "例: libs/domains/finance/frontend-next/"
+            - i: "例: libs/domains/habits/frontend-flutter/"
+            - i: "内部: components/, state/, api/"
+          n: "domain × tech の単位。fn 単位での分割は禁止（同一ドメイン内の fn は状態を共有するため）"
       n: "ドメイン名はビジネス用語に合わせる。技術用語は使わない"
     - i: "プラットフォーム（libs/platform/）"
       c:
@@ -113,7 +114,8 @@
       c:
         - i: "def.yaml — interface 定義（SDD 契約）"
         - i: "spec.yaml — パッケージ別仕様"
-        - i: "detaildesign.md — 詳細設計"
+        - i: "detaildesign-be.md — BE 詳細設計"
+        - i: "detaildesign-fe.md — FE 詳細設計"
       n: "ドメインより軽い構成。rule/store/ref/schema は不要"
     - i: "実装タスク"
       c:

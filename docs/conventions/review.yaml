@@ -33,8 +33,8 @@
         - i: "必読ソース"
           c:
             - i: "docs/domains/{domain}/fn-*.yaml — ui セクション"
-            - i: "libs/domains/{domain}/backend/entrypoint/ — MCPハンドラ"
-            - i: "docs/domains/{domain}/detaildesign.md — entrypoint セクション"
+            - i: "libs/domains/{domain}/backend-{tech}/entrypoint/ — MCPハンドラ"
+            - i: "docs/domains/{domain}/detaildesign-be.md — entrypoint セクション"
       n: "entrypoint/ 層と MCP 設定に関わるレビュー"
     - i: "ux-designer（UXデザイナー）"
       c:
@@ -56,8 +56,8 @@
           c:
             - i: "docs/domains/{domain}/def.yaml"
             - i: "docs/domains/{domain}/fn-*.yaml — interface セクション"
-            - i: "libs/domains/{domain}/backend/define/ — 型定義コード"
-            - i: "docs/domains/{domain}/detaildesign.md — Go 型定義セクション"
+            - i: "libs/domains/{domain}/backend-{tech}/define/ — 型定義コード"
+            - i: "docs/domains/{domain}/detaildesign-be.md — Go 型定義セクション"
       n: "契約が先、実装が後。逆転を検出する"
     - i: "ddd-auditor（DDD監査委員）"
       c:
@@ -71,8 +71,8 @@
             - i: "docs/domains/{domain}/def.yaml"
             - i: "docs/domains/{domain}/rule.yaml"
             - i: "docs/domains/{domain}/ref.yaml"
-            - i: "libs/domains/{domain}/backend/define/"
-            - i: "libs/domains/{domain}/backend/usecase/"
+            - i: "libs/domains/{domain}/backend-{tech}/define/"
+            - i: "libs/domains/{domain}/backend-{tech}/usecase/"
       n: "ドメインの純粋性を守る番人"
     - i: "go-hacker（Goハッカー）"
       c:
@@ -109,12 +109,12 @@
         - i: "GCS のアクセス制御、オブジェクトバージョニング"
         - i: "必読ソース"
           c:
-            - i: "libs/domains/{domain}/backend/infrastructure/ — SQL・外部接続"
-            - i: "libs/domains/{domain}/backend/entrypoint/ — 入力受付"
+            - i: "libs/domains/{domain}/backend-{tech}/infrastructure/ — SQL・外部接続"
+            - i: "libs/domains/{domain}/backend-{tech}/entrypoint/ — 入力受付"
             - i: "libs/platform/ — 接続実体"
             - i: "Dockerfile"
             - i: "docs/domains/{domain}/schema.yaml — テーブル定義"
-            - i: "docs/domains/{domain}/detaildesign.md — 認証・デプロイセクション"
+            - i: "docs/domains/{domain}/detaildesign-be.md — 認証・デプロイセクション"
       n: "全フェーズで起動するが、インフラ・デプロイ時にウェイト増"
     - i: "test-engineer（テストエンジニア）"
       c:
@@ -125,8 +125,8 @@
         - i: "統合テストの環境設計"
         - i: "必読ソース"
           c:
-            - i: "libs/domains/{domain}/backend/*/testdata/*.yaml — テスト定義（必須）"
-            - i: "libs/domains/{domain}/backend/*/*_test.go — テストコード（必須）"
+            - i: "libs/domains/{domain}/backend-{tech}/*/testdata/*.yaml — テスト定義（必須）"
+            - i: "libs/domains/{domain}/backend-{tech}/*/*_test.go — テストコード（必須）"
             - i: "docs/domains/{domain}/fn-*.yaml — エラーケース一覧（必須）"
             - i: "docs/domains/{domain}/rule.yaml — ビジネスルール（必須）"
             - i: "docs/conventions/testing.yaml"
@@ -143,7 +143,7 @@
           c:
             - i: "Dockerfile"
             - i: "libs/platform/ — 接続管理コード"
-            - i: "docs/domains/{domain}/detaildesign.md — デプロイセクション"
+            - i: "docs/domains/{domain}/detaildesign-be.md — デプロイセクション"
             - i: "docs/domains/{domain}/schema.yaml — DB 設計"
             - i: "docs/domains/{domain}/store.yaml — ストア設計"
       n: "デプロイ・インフラ設定のレビュー"
@@ -164,7 +164,7 @@
 
     - i: "detail-design（詳細設計レビュー）"
       c:
-        - i: "対象: detaildesign.md"
+        - i: "対象: detaildesign-be.md / detaildesign-fe.md"
         - i: "Agent構成（計7体）"
           c:
             - i: "senior-architect × 1"
@@ -177,7 +177,7 @@
 
     - i: "impl-define（define/ 実装レビュー）"
       c:
-        - i: "対象: libs/domains/{domain}/backend/define/"
+        - i: "対象: libs/domains/{domain}/backend-{tech}/define/"
         - i: "Agent構成（計5体）"
           c:
             - i: "sdd-auditor × 2"
@@ -188,7 +188,7 @@
 
     - i: "impl-usecase（usecase/ 実装レビュー）"
       c:
-        - i: "対象: libs/domains/{domain}/backend/usecase/"
+        - i: "対象: libs/domains/{domain}/backend-{tech}/usecase/"
         - i: "Agent構成（計6体）"
           c:
             - i: "go-hacker × 2"
@@ -199,7 +199,7 @@
 
     - i: "impl-infrastructure（infrastructure/ 実装レビュー）"
       c:
-        - i: "対象: libs/domains/{domain}/backend/infrastructure/"
+        - i: "対象: libs/domains/{domain}/backend-{tech}/infrastructure/"
         - i: "Agent構成（計6体）"
           c:
             - i: "go-hacker × 2"
@@ -211,7 +211,7 @@
 
     - i: "impl-entrypoint（entrypoint/ 実装レビュー）"
       c:
-        - i: "対象: libs/domains/{domain}/backend/entrypoint/"
+        - i: "対象: libs/domains/{domain}/backend-{tech}/entrypoint/"
         - i: "Agent構成（計5体）"
           c:
             - i: "mcp-designer × 2"
@@ -222,7 +222,7 @@
 
     - i: "impl-interpoint（interpoint/ 実装レビュー）"
       c:
-        - i: "対象: libs/domains/{domain}/backend/interpoint/"
+        - i: "対象: libs/domains/{domain}/backend-{tech}/interpoint/"
         - i: "Agent構成（計5体）"
           c:
             - i: "go-hacker × 1"

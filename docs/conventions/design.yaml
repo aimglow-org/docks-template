@@ -335,20 +335,20 @@
         - i: "対象: docs/conventions/ 配下の全規約ファイル"
     - i: "Markdown ファイル: 自由フォーマット（視認性重視）"
       c:
-        - i: "対象: detaildesign.md — 実装レベルの詳細を記述するため可読性を優先する"
+        - i: "対象: detaildesign-be.md / detaildesign-fe.md — 実装レベルの詳細を記述するため可読性を優先する"
         - i: "見出し階層（## Heading）を統一し、目次として機能させる"
   n: "YAML は構造化、Markdown は可読性。使い分ける"
 
 - i: "testdata 配置規約"
   c:
-    - i: "配置先: libs/domains/{domain}/backend/{layer}/testdata/"
+    - i: "配置先: libs/domains/{domain}/backend-{tech}/{layer}/testdata/"
     - i: "ファイル形式: YAML（test-runner-go の YAML ローダーで読み込む）"
     - i: "例"
       c:
-        - i: "libs/domains/{domain}/backend/define/testdata/ — エンティティ・値オブジェクトのテストケース"
-        - i: "libs/domains/{domain}/backend/usecase/testdata/ — ユースケースのテストケース"
-        - i: "libs/domains/{domain}/backend/infrastructure/testdata/ — リポジトリのテストケース"
-    - i: "detaildesign.md のディレクトリ構成セクションに testdata パスを必ず記載する"
+        - i: "libs/domains/{domain}/backend-{tech}/define/testdata/ — エンティティ・値オブジェクトのテストケース"
+        - i: "libs/domains/{domain}/backend-{tech}/usecase/testdata/ — ユースケースのテストケース"
+        - i: "libs/domains/{domain}/backend-{tech}/infrastructure/testdata/ — リポジトリのテストケース"
+    - i: "detaildesign-be.md のディレクトリ構成セクションに testdata パスを必ず記載する"
   n: "テストデータは各層に配置する。層ごとにテストの関心事が異なるため、共有 testdata は作らない"
 
 - i: "Atlas 運用（DB スキーマ管理）"
@@ -546,6 +546,210 @@
                 - i: "画面数は 30% を超えるが使用 API がシンプル（位置情報のみ等）→ Flutter を検討可"
                 - i: "判断つかない場合 → Flutter で開始し、壁にぶつかったら該当画面のみネイティブモジュール化"
 
+- i: "FE レイヤー構成（3層）"
+  n: "BE の4+α層に対応する FE 側のレイヤー定義。動的アプリを主とし、静的サイトの場合は Layer 2 を省略可"
+  c:
+    - i: "概要: 3層で責務分離する"
+      c:
+        - i: "Layer 1: Design System（shared — 全ドメイン共通）"
+        - i: "Layer 2: Domain FE（ドメイン固有の状態・コンポーネント）"
+        - i: "Layer 3: App（画面合成・ルーティング・デプロイ単位）"
+      n: "BE の shared/ ↔ domains/{d}/backend-{tech}/ ↔ apps/ と対称構造"
+    - i: "依存の方向"
+      c:
+        - i: "App (pages/) → Domain FE (components/, state/) → Design System (primitives/, tokens/)"
+        - i: "Domain FE の api/ → api-schema/generated/"
+      n: "Design System は何にも依存しない。Domain FE は Design System にのみ依存。App は両方に依存"
+    - i: "Layer 1: Design System"
+      c:
+        - i: "配置: libs/shared/design-system-{tech}/"
+          c:
+            - i: "design-system-next/ — Next.js 用"
+            - i: "design-system-flutter/ — Flutter 用（必要時のみ）"
+          n: "技術スタック単位で分割する。コード共有不可能な異なるランタイムのため"
+        - i: "内部構成"
+          c:
+            - i: "tokens/ — Figma 同期のデザイントークン（CSS Variables / Dart class）"
+            - i: "primitives/ — 最小単位の UI 部品（Button, Input, Icon, Text）"
+            - i: "composites/ — primitives の組み合わせによる複合部品（Form, Card, Modal, DataTable）"
+            - i: "layouts/ — ページレイアウトパターン（Sidebar, Stack, Grid）"
+        - i: "責務"
+          c:
+            - i: "tokens/: Figma が single source of truth。/imp の ui-design 後に CC が同期する"
+            - i: "primitives/: ドメインロジックを一切持たない。プロジェクト共通の基本部品"
+            - i: "composites/: 汎用的なもののみ配置。ドメイン固有は Layer 2 に置く"
+            - i: "layouts/: ページの骨格パターン。中身（コンテンツ）に依存しない"
+          n: "token 値の直書き（hardcoded hex, px 値等）は primitives/ 以上の層で禁止"
+    - i: "Layer 2: Domain FE"
+      c:
+        - i: "配置: libs/domains/{domain}/frontend-{tech}/"
+          c:
+            - i: "frontend-next/ — Next.js 用"
+            - i: "frontend-flutter/ — Flutter 用（必要時のみ）"
+          n: "BE の backend-{tech}/ と並列に配置する。domain × tech の単位"
+        - i: "内部構成"
+          c:
+            - i: "components/ — ドメイン固有コンポーネント（ドメインの語彙で命名）"
+            - i: "state/ — ドメインの状態管理"
+              c:
+                - i: "hooks/ — Next.js: React hooks（データ取得、楽観更新）"
+                - i: "stores/ — 必要に応じて追加（Zustand 等）"
+            - i: "api/ — api-schema generated/ のドメインラッパー"
+        - i: "fn を domain 内に統合する理由"
+          c:
+            - i: "同一ドメイン内の fn は同じエンティティ・同じ状態を扱うため必然的に結合する"
+            - i: "fn 単位で分割すると fn 間 import が発生し、分割の意味がなくなる"
+            - i: "fn の「何を見せるか」は Layer 3 の page で決める"
+          n: "fn 単位での FE 分割は禁止。ドメイン境界が本来の責務境界"
+        - i: "YAGNI: 静的サイトの場合、Layer 2 は不要（Layer 1 + Layer 3 で構成可）"
+    - i: "Layer 3: App"
+      c:
+        - i: "配置: apps/{app-name}/"
+        - i: "内部構成（Next.js の場合）"
+          c:
+            - i: "app/ — App Router（ルーティング・画面合成）"
+              c:
+                - i: "layout.tsx — ルートレイアウト"
+                - i: "(group)/ — レイアウトグループ（認証有無等）"
+                - i: "{feature}/page.tsx — 画面（Domain FE の components を合成）"
+            - i: "providers/ — グローバルプロバイダー（Theme, Auth, QueryClient）"
+            - i: "config/ — 環境設定"
+        - i: "内部構成（Flutter の場合）"
+          c:
+            - i: "lib/router/ — GoRouter 等のルーティング定義"
+            - i: "lib/providers/ — Riverpod / Provider 等"
+            - i: "lib/screens/ — 画面構成（Domain FE の Widget を合成）"
+        - i: "責務"
+          c:
+            - i: "page は「合成」のみ行う。ロジックは Domain FE に、部品は Design System に委譲"
+            - i: "ルーティングと画面遷移の定義がこの層の主な責務"
+          n: "fn-*.yaml の画面仕様が App 層の page 構成に対応する"
+    - i: "BE 4層との対応関係"
+      c:
+        - i: "BE define/ ↔ FE tokens/ + primitives/ — 契約（見た目の契約）"
+        - i: "BE usecase/ ↔ FE state/ + components/ — ロジック（表示ロジック + ドメイン UI）"
+        - i: "BE infrastructure/ ↔ FE api/ — 外部依存（API 接続の実装）"
+        - i: "BE entrypoint/ ↔ FE app/pages/ — ユーザー接点"
+    - i: "静的 vs 動的の違い"
+      c:
+        - i: "静的サイト（LP, ドキュメント）: Layer 1 + Layer 3 のみ。Layer 2 は不要"
+        - i: "動的アプリ（SaaS, 管理画面）: 全3層を使用。state/, api/ が厚くなる"
+        - i: "モバイルアプリ（Flutter）: 全3層。Design System は Flutter 版を使用"
+      n: "3層構成自体は不変。動的度合いによって Layer 2 の厚さが変わるだけ"
+
+- i: "FE 設計書体系"
+  n: "BE の設計書体系（def/rule/store/fn/detaildesign）と対称に、FE 側の設計書を定義する"
+  c:
+    - i: "設計フロー（BE と FE の対比）"
+      c:
+        - i: "BE: def.yaml → rule.yaml → store.yaml → fn-*.yaml → detaildesign-be.md → 実装"
+        - i: "FE: def.yaml(確認) → fe-def.yaml → fe-state.yaml → fn-*.yaml(ui) → detaildesign-fe.md → 実装"
+      n: "FE は BE の def.yaml を確認してから FE 固有の設計に入る。rule.yaml は BE/FE 共通参照"
+    - i: "ドメイン設計書の全体構成"
+      c:
+        - i: "docs/domains/{domain}/ に BE と FE の設計書が並列に配置される"
+          c:
+            - i: "def.yaml — BE 型・インターフェース定義（既存）"
+            - i: "rule.yaml — ビジネスルール（既存、BE/FE 共通参照）"
+            - i: "store.yaml — データストア設計（既存）"
+            - i: "ref.yaml — ドメイン間参照（既存、FE でもドメイン間依存の判断に使用）"
+            - i: "schema.yaml — スキーマ定義（既存）"
+            - i: "fn-{name}.yaml — 機能仕様（既存、ui セクション含む）"
+            - i: "detaildesign-be.md — BE 詳細設計"
+            - i: "fe-def.yaml — FE 定義（コンポーネント、API ラッパー）"
+            - i: "fe-state.yaml — FE 状態設計（サーバー状態、クライアント状態）"
+            - i: "detaildesign-fe.md — FE 詳細設計"
+    - i: "fe-def.yaml — FE 定義（BE の def.yaml に対応）"
+      c:
+        - i: "役割: ドメイン内の FE コンポーネントと API ラッパーの契約を定義する"
+        - i: "ドメインコンポーネント一覧"
+          c:
+            - i: "各コンポーネントに定義する項目"
+              c:
+                - i: "props — 入力プロパティ（型は def.yaml のエンティティ・VO を参照）"
+                - i: "表示要素 — 何を表示するか"
+                - i: "Design System 依存 — primitives/composites のどれを使うか"
+                - i: "使用 fn — どの fn-*.yaml で使用されるか（複数可）"
+            - i: "fn を跨いで使用されるコンポーネントを明示的に定義する"
+          n: "fn 単位ではなく domain 単位でコンポーネントを定義する。同一ドメイン内の fn 間で自由に共有"
+        - i: "API ラッパー定義"
+          c:
+            - i: "api-schema generated/ のドメインラッパーを定義する"
+            - i: "命名はドメインの語彙で（useOrders, useCreateOrder 等）"
+            - i: "各ラッパーに入力型・出力型・エラーハンドリング方針を記載する"
+          n: "generated/ のコードを直接使わず、ドメインの言葉で包む層の契約"
+        - i: "BE def.yaml との対称性"
+          c:
+            - i: "BE エンティティ定義 ↔ FE コンポーネント定義（props, 表示要素）"
+            - i: "BE インターフェース（Repository 等） ↔ FE API ラッパー定義（hooks）"
+            - i: "BE VO・Enum → FE は BE def.yaml を参照（再定義しない）"
+      n: "fe-def.yaml は『ドメインにどんな FE 部品と API があるか』の部品カタログ"
+    - i: "fe-state.yaml — FE 状態設計（BE の store.yaml に対応）"
+      c:
+        - i: "役割: どの状態をどこに持ち、どう管理するかを定義する"
+        - i: "サーバー状態（API 由来）"
+          c:
+            - i: "各状態に定義する項目"
+              c:
+                - i: "取得元 — fe-def.yaml の API ラッパー参照"
+                - i: "キャッシュキー — TanStack Query 等のキー設計"
+                - i: "stale time — キャッシュの鮮度"
+                - i: "楽観更新 — ミューテーション時の即座反映方針"
+                - i: "リフェッチ — 画面フォーカス時、ポーリング等の方針"
+        - i: "クライアント状態（UI ローカル）"
+          c:
+            - i: "各状態に定義する項目"
+              c:
+                - i: "型 — TypeScript 型定義"
+                - i: "スコープ — 局所（単一コンポーネント）/ 広域（複数画面共有）"
+                - i: "永続化 — なし / URL search params / localStorage"
+        - i: "状態の分類基準"
+          c:
+            - i: "サーバー状態: API から取得するデータ → TanStack Query 等"
+            - i: "クライアント状態（広域）: 複数画面で共有 → Zustand / URL params"
+            - i: "クライアント状態（局所）: 単一コンポーネント内 → useState"
+          n: "迷ったら局所。広域は証明できてから昇格する"
+        - i: "BE store.yaml との対称性"
+          c:
+            - i: "BE テーブル設計 ↔ FE サーバー状態（キャッシュ設計）"
+            - i: "BE インデックス ↔ FE キャッシュキー設計"
+            - i: "BE マイグレーション方針 ↔ FE 楽観更新・リフェッチ方針"
+      n: "fe-state.yaml は『データをどう流し、どこに保持するか』のデータフロー設計"
+    - i: "detaildesign-fe.md — FE 詳細設計（BE の detaildesign-be.md と対）"
+      c:
+        - i: "役割: fe-def.yaml と fe-state.yaml で決めた『何を作るか』に対し、『どう実装するか』の曖昧さを排除する"
+        - i: "記載すべき判断事項"
+          c:
+            - i: "コンポーネント実装判断 — トークンの使い分け、アニメーション要否、レスポンシブ対応"
+            - i: "状態管理ライブラリ選定 — TanStack Query, Zustand 等の具体選定と理由"
+            - i: "パフォーマンス考慮 — 仮想スクロール要否、画像最適化、バンドルサイズ"
+            - i: "アクセシビリティ — aria 属性、キーボード操作、スクリーンリーダー対応"
+            - i: "エラーハンドリング — API エラー時の UI 表示、リトライ方針"
+        - i: "fe-def.yaml / fe-state.yaml で決まらないことをここで確定する"
+      n: "実装者が迷わないレベルまで判断を確定する。迷いが残る場合はこのファイルの記述が不足している"
+    - i: "fn-*.yaml の ui セクションとの関係"
+      c:
+        - i: "fe-def.yaml = 部品カタログ（ドメインにどんな部品・API があるか）"
+        - i: "fn-*.yaml ui = 合成レシピ（この機能でどの部品をどう組み合わせるか）"
+        - i: "fe-state.yaml = データフロー（状態をどう管理するか）"
+        - i: "detaildesign-fe.md = 実装判断（どう作るか）"
+      n: "fn-*.yaml の ui セクションは fe-def.yaml で定義されたコンポーネントを参照する形で記述する"
+    - i: "rule.yaml の FE 共用"
+      c:
+        - i: "バリデーションルールは BE/FE で共通参照する"
+        - i: "rule.yaml に定義されたルールを FE 側でも再現する（二重定義ではなく同一ソース参照）"
+        - i: "FE 固有の UI バリデーション（文字数制限のリアルタイム表示等）は fe-def.yaml のコンポーネント props 内に記述する"
+      n: "ビジネスルールの源泉は rule.yaml。FE は参照して再現する側"
+    - i: "Design System 設計書"
+      c:
+        - i: "配置: docs/shared/design-system-{tech}/"
+        - i: "既存の shared 設計書パターンを踏襲する"
+          c:
+            - i: "def.yaml — トークン定義 + コンポーネント契約（props, variants, アクセシビリティ要件）"
+            - i: "spec.yaml — コンポーネントカタログ（使用例、組み合わせパターン、禁止パターン）"
+            - i: "detaildesign.md — 実装判断（CSS 戦略、バンドル方針、テスト方針）"
+      n: "Design System は全ドメインから参照される共通基盤。def.yaml が契約、spec.yaml が仕様"
+
 - i: "世代管理パターン（マスタデータの有効期間管理）"
   c:
     - i: "対象: 料金表、ルール設定、権限定義など、有効期間を持つマスタデータ"
@@ -629,7 +833,7 @@
       c:
         - i: "1. fn-*.yaml の interface セクションを修正する"
         - i: "2. def.yaml を修正する（必要な場合）"
-        - i: "3. detaildesign.md の型定義セクションを修正する"
+        - i: "3. detaildesign-be.md の型定義セクションを修正する"
         - i: "4. 上記 5 種類のレビューを実施する"
         - i: "5. define/ の Go コードを修正する"
         - i: "6. 影響を受ける usecase/, infrastructure/, entrypoint/ を修正する"

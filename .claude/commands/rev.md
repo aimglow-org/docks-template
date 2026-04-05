@@ -20,7 +20,7 @@
 指定可能な値:
 
 - `basic-design` — 基本設計レビュー（def.yaml, rule.yaml, fn-*.yaml 等）
-- `detail-design` — 詳細設計レビュー（detaildesign.md）
+- `detail-design` — 詳細設計レビュー（detaildesign-be.md / detaildesign-fe.md）
 - `impl-define` — define/ 実装レビュー
 - `impl-usecase` — usecase/ 実装レビュー
 - `impl-infrastructure` — infrastructure/ 実装レビュー
@@ -138,12 +138,13 @@ Critical が 0 件になるまで修正→再レビューを繰り返す。
 | ファイルパスのパターン | レビュー種別 |
 |---|---|
 | `docs/domains/*/def.yaml`, `rule.yaml`, `fn-*.yaml` 等 | `basic-design` |
-| `docs/domains/*/detaildesign.md` | `detail-design` |
-| `libs/domains/*/backend/define/` | `impl-define` |
-| `libs/domains/*/backend/usecase/` | `impl-usecase` |
-| `libs/domains/*/backend/infrastructure/` | `impl-infrastructure` |
-| `libs/domains/*/backend/entrypoint/` | `impl-entrypoint` |
-| `libs/domains/*/backend/interpoint/` | `impl-interpoint` |
+| `docs/domains/*/detaildesign-be.md` | `detail-design` |
+| `docs/domains/*/detaildesign-fe.md` | `detail-design` |
+| `libs/domains/*/backend-{tech}/define/` | `impl-define` |
+| `libs/domains/*/backend-{tech}/usecase/` | `impl-usecase` |
+| `libs/domains/*/backend-{tech}/infrastructure/` | `impl-infrastructure` |
+| `libs/domains/*/backend-{tech}/entrypoint/` | `impl-entrypoint` |
+| `libs/domains/*/backend-{tech}/interpoint/` | `impl-interpoint` |
 | `libs/platform/` | `impl-platform` |
 | `libs/shared/`（test-runner-go 以外） | `impl-shared` |
 | `*/testdata/*.yaml` | `test-design` |

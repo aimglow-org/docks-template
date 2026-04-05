@@ -30,10 +30,10 @@
         - i: "変更された YAML に対して /rev basic-design を実行する"
         - i: "他の YAML との整合性を検証する"
         - i: "critical 指摘が 0 件になるまで修正する"
-    - i: "Step 3: detaildesign.md の整合性確認"
+    - i: "Step 3: detaildesign-be.md / detaildesign-fe.md の整合性確認"
       c:
-        - i: "detaildesign.md を読み込み、変更された YAML との不整合を検出する"
-        - i: "不整合がある場合、detaildesign.md を更新する"
+        - i: "detaildesign-be.md（および FE がある場合は detaildesign-fe.md）を読み込み、変更された YAML との不整合を検出する"
+        - i: "不整合がある場合、該当する detaildesign を更新する"
         - i: "更新後、/rev detail-design を実行する"
     - i: "Step 4: 他機能との不整合確認"
       c:
@@ -77,7 +77,7 @@
             影響範囲:
             - def.yaml: SessionType.IsValid() の仕様変更
             - rule.yaml: バリデーションルール追加
-            - detaildesign.md: value.go の実装更新
+            - detaildesign-be.md: value.go の実装更新
             - testdata/save_dialogue_test.yaml: 異常系ケース追加
 
 - i: "エスカレーション判断基準"

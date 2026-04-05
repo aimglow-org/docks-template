@@ -13,7 +13,7 @@
   c:
     - i: "test.spec.md — 人間可読のテスト仕様（SSoT）"
       c:
-        - i: "配置先: docs/domains/{domain}/.task/ または detaildesign.md のテスト方針セクション"
+        - i: "配置先: docs/domains/{domain}/.task/ または detaildesign-be.md のテスト方針セクション"
         - i: "内容: テストケース一覧、テスト戦略、期待結果の自然言語記述"
         - i: "作成タイミング: /test design の最初に作成する"
         - i: "/rev test-design でレビュー対象になる"
@@ -49,8 +49,8 @@
   c:
     - i: "配置先"
       c:
-        - i: "libs/domains/{domain}/backend/{layer}/testdata/"
-        - i: "例: libs/domains/dialogue/backend/usecase/testdata/"
+        - i: "libs/domains/{domain}/backend-{tech}/{layer}/testdata/"
+        - i: "例: libs/domains/dialogue/backend-go/usecase/testdata/"
     - i: "ファイル命名"
       c:
         - i: "{対象関数名}_test.yaml"

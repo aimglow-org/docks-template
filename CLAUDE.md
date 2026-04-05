@@ -61,21 +61,26 @@ develop              ← 開発の主流ブランチ
 ## 設計フロー
 
 ```
-1. conventions/        規約を読む（必須）
+1. conventions/          規約を読む（必須）
        ↓
-2. docs/domains/{d}/   基本設計（YAML）を書く
-   ├── def.yaml           定義（エンティティ、値オブジェクト）
-   ├── rule.yaml           ビジネスルール
-   ├── store.yaml          データストア設計
-   ├── ref.yaml            ドメイン間参照
-   ├── schema.yaml         スキーマ定義
-   └── fn-{機能名}.yaml   機能仕様（interface, usecase, ui）
+2. docs/domains/{d}/     基本設計（YAML）を書く
+   ├── def.yaml             定義（エンティティ、値オブジェクト）
+   ├── rule.yaml             ビジネスルール（BE/FE 共通）
+   ├── store.yaml            データストア設計
+   ├── ref.yaml              ドメイン間参照
+   ├── schema.yaml           スキーマ定義
+   ├── fn-{機能名}.yaml     機能仕様（interface, usecase, ui）
+   ├── fe-def.yaml           FE 定義（コンポーネント、API ラッパー）
+   └── fe-state.yaml         FE 状態設計（サーバー状態、クライアント状態）
        ↓
-3. detaildesign.md     詳細設計（曖昧排除、実装確定）
+3. detaildesign-be.md    BE 詳細設計（曖昧排除、実装確定）
+   detaildesign-fe.md    FE 詳細設計
        ↓
-4. .task/impl-{nnn}    実装タスク作成
+4. .task/impl-{nnn}      実装タスク作成
        ↓
-5. libs/domains/{d}/   コード実装（4+α層構成）
+5. libs/domains/{d}/     コード実装
+   ├── backend-{tech}/       BE 4+α層構成
+   └── frontend-{tech}/     FE 3層構成
 ```
 
 ### YAML 要素記法（Workflowy 互換）
@@ -114,20 +119,27 @@ develop              ← 開発の主流ブランチ
   │   │   └── escalation.yaml                エスカレーション規約
   │   ├── domains/                         ドメイン別設計
   │   │   └── {domain}/
-  │   │       ├── def.yaml
-  │   │       ├── rule.yaml
-  │   │       ├── store.yaml
-  │   │       ├── ref.yaml
-  │   │       ├── schema.yaml
-  │   │       ├── fn-{機能名}.yaml
-  │   │       ├── detaildesign.md
+  │   │       ├── def.yaml                    BE 定義（エンティティ、VO、契約）
+  │   │       ├── rule.yaml                    ビジネスルール（BE/FE 共通）
+  │   │       ├── store.yaml                   データストア設計
+  │   │       ├── ref.yaml                     ドメイン間参照
+  │   │       ├── schema.yaml                  スキーマ定義
+  │   │       ├── fn-{機能名}.yaml            機能仕様（interface, usecase, ui）
+  │   │       ├── detaildesign-be.md            BE 詳細設計
+  │   │       ├── fe-def.yaml                  FE 定義（コンポーネント、API ラッパー）
+  │   │       ├── fe-state.yaml                FE 状態設計
+  │   │       ├── detaildesign-fe.md            FE 詳細設計
   │   │       └── .task/
   │   │           ├── impl-001.prog.md
   │   │           └── impl-002.done.md
   │   └── shared/                          shared ライブラリ設計
-  │       └── {分類名}-{名前}-{言語}/
-  │           ├── def.yaml                 interface 定義（SDD 契約）
-  │           ├── spec.yaml                パッケージ別仕様
+  │       ├── {分類名}-{名前}-{言語}/
+  │       │   ├── def.yaml                 interface 定義（SDD 契約）
+  │       │   ├── spec.yaml                パッケージ別仕様
+  │       │   └── detaildesign.md
+  │       └── design-system-{tech}/        FE Design System 設計
+  │           ├── def.yaml                 トークン定義・コンポーネント契約
+  │           ├── spec.yaml                コンポーネントカタログ
   │           └── detaildesign.md
   │
   ├── apps/
@@ -136,13 +148,17 @@ develop              ← 開発の主流ブランチ
   ├── libs/
   │   ├── domains/                      ← ドメインロジック（bounded contexts）
   │   │   └── {domain}/
-  │   │       └── backend/
-  │   │           ├── define/           ← 型定義・インターフェース（契約）
-  │   │           ├── usecase/          ← ビジネスロジック
-  │   │           │   └── dto/          ← Proto ↔ Domain 変換（必要時）
-  │   │           ├── infrastructure/   ← 外部依存の実装（repository 等）
-  │   │           ├── entrypoint/       ← ハンドラ・公開API（FE向け、Bearer token）
-  │   │           └── interpoint/       ← サービス間内部API（mTLS、必要時のみ）
+  │   │       ├── backend-{tech}/        ← BE 4+α層（Go の場合 backend-go/）
+  │   │       │   ├── define/           ← 型定義・インターフェース（契約）
+  │   │       │   ├── usecase/          ← ビジネスロジック
+  │   │       │   │   └── dto/          ← Proto ↔ Domain 変換（必要時）
+  │   │       │   ├── infrastructure/   ← 外部依存の実装（repository 等）
+  │   │       │   ├── entrypoint/       ← ハンドラ・公開API（FE向け、Bearer token）
+  │   │       │   └── interpoint/       ← サービス間内部API（mTLS、必要時のみ）
+  │   │       └── frontend-{tech}/      ← FE ドメイン層（動的アプリで使用）
+  │   │           ├── components/       ← ドメイン固有コンポーネント
+  │   │           ├── state/            ← 状態管理（hooks/, stores/）
+  │   │           └── api/              ← api-schema generated/ のラッパー
   │   │
   │   ├── platform/                     ← 外部接続実体（GCP, 外部API）
   │   │   ├── gcp-cloudsql-go/          ← CloudSQL クライアント
@@ -150,7 +166,8 @@ develop              ← 開発の主流ブランチ
   │   │   └── api-{name}-go/           ← 各種外部API クライアント
   │   │
   │   ├── shared/                       ← 複数ドメインから参照される共通コード
-  │   │   └── test-runner-go/          ← テスト基盤（YAML ローダー、validator、モック）
+  │   │   ├── test-runner-go/          ← テスト基盤（YAML ローダー、validator、モック）
+  │   │   └── design-system-{tech}/    ← FE Design System（tokens, primitives, composites, layouts）
   │   │
   │   └── api-schema/                   ← インターフェース定義（orphan branch から同期）
   │       └── generated/                ← buf generate 結果（go/, dart/, ts/ 等）
@@ -179,7 +196,7 @@ develop              ← 開発の主流ブランチ
 **すべてのドメインは以下の基本4層で構成する。例外なし。interpoint/ はドメイン間通信が必要な場合のみ追加。**
 
 ```
-libs/domains/{domain}/backend/
+libs/domains/{domain}/backend-{tech}/
   ├── define/           ← 型・インターフェース定義（契約）
   │                        他の層はすべてこの定義に依存する。proto を import しない
   ├── usecase/          ← ビジネスロジック（define に依存）
@@ -192,6 +209,37 @@ libs/domains/{domain}/backend/
 ```
 
 **依存の方向:** `entrypoint/interpoint → usecase → define ← infrastructure`
+
+### FE 3層構成
+
+**動的アプリは以下の3層で構成する。静的サイトの場合 Layer 2 は省略可。**
+
+```
+Layer 1: Design System（全ドメイン共通）
+libs/shared/design-system-{tech}/
+  ├── tokens/           ← Figma 同期のデザイントークン
+  ├── primitives/       ← 最小単位の UI 部品（Button, Input, Icon）
+  ├── composites/       ← 複合部品（Form, Card, Modal, DataTable）
+  └── layouts/          ← レイアウトパターン（Sidebar, Stack, Grid）
+
+Layer 2: Domain FE（ドメイン固有）
+libs/domains/{domain}/frontend-{tech}/
+  ├── components/       ← ドメイン固有コンポーネント
+  ├── state/            ← 状態管理（hooks/, stores/）
+  └── api/              ← api-schema generated/ のドメインラッパー
+
+Layer 3: App（画面合成・デプロイ単位）
+apps/{app-name}/
+  ├── app/              ← ルーティング・画面合成（page は合成のみ）
+  ├── providers/        ← グローバルプロバイダー
+  └── config/           ← 環境設定
+```
+
+**依存の方向:** `App (pages/) → Domain FE (components/, state/) → Design System (tokens/, primitives/)`
+
+- **fn 単位での FE 分割は禁止。** 同一ドメイン内の fn は同じ状態を共有するため、domain 境界が責務境界
+- **{tech}** は `next`（Next.js）、`flutter`（Flutter）等。技術スタック単位で分割
+- **詳細**: `docs/conventions/design.yaml` の「FE レイヤー構成」セクションを参照
 
 ### 通信方式
 
@@ -219,7 +267,8 @@ proto 定義と生成コードを FE/BE 間で共有するための仕組み。
 - **Code Connect**: Figma コンポーネント ↔ コードのマッピング。乖離防止の要
 - **Mock アプリ**: インタラクション確認用
 - **FE 技術選定**: Next.js（デフォルト）→ Flutter（両OS + OS固有30%以下）→ Swift/Kotlin（OS固有30%超）
-- **詳細**: `docs/conventions/design.yaml` の「FE 設計・UI レビュー運用」セクションを参照
+- **Design System → Domain FE → App** の3層に沿って実装する
+- **詳細**: `docs/conventions/design.yaml` の「FE 設計・UI レビュー運用」「FE レイヤー構成」セクションを参照
 
 ## コーディング規約
 

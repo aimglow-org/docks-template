@@ -14,7 +14,7 @@
 | （なし） | 自動推定 | 次にやるべきステップを自動実行 |
 | `init` | 造船所セッション開始 | conventions/ 読み込み完了 |
 | `basic-design {domain}` | 基本設計 | YAML ファイル群 |
-| `detail-design {domain}` | 詳細設計 | detaildesign.md |
+| `detail-design {domain}` | 詳細設計 | detaildesign-be.md |
 | `ui-design {domain}` | UI 設計 | Figma デザイン + Code Connect |
 | `ui-mock {domain}` | Mock アプリ実装 | apps/mock-{project}-{framework}/ |
 | `task {domain}` | 実装タスク作成 | .task/impl-{nnn}.prog.md |
@@ -49,7 +49,7 @@
    → Yes: `/imp deploy` を提案
    → No: 次へ
 
-3. `detaildesign.md` が存在し、`.task/` が未作成？
+3. `detaildesign-be.md` が存在し、`.task/` が未作成？
    → Yes: UI 判定へ（ステップ 3a）
    → No: 次へ
 
@@ -125,7 +125,7 @@ YAML 要素記法:
 前提条件: 基本設計 YAML が存在すること
 
 1. `docs/domains/{domain}/` 配下の全 YAML を読み込む
-2. `detaildesign.md` を作成する。以下を含める:
+2. `detaildesign-be.md` を作成する。以下を含める:
    - 実装スコープ（本フェーズで実装する機能 / しない機能を明記）
    - 非機能要件（認証、ログ、エラーハンドリング）
    - ディレクトリ構成（全ファイルパスを確定）
@@ -143,7 +143,7 @@ YAML 要素記法:
 4. コミットする
 5. 完了後、`/rev detail-design` の実行を提案する
 
-完了条件: detaildesign.md が作成され、曖昧表現が 0 件であること。
+完了条件: detaildesign-be.md が作成され、曖昧表現が 0 件であること。
 
 ---
 
@@ -215,9 +215,9 @@ YAML 要素記法:
 
 **実装タスクを作成する。**
 
-前提条件: detaildesign.md が存在すること
+前提条件: detaildesign-be.md が存在すること
 
-1. `docs/domains/{domain}/detaildesign.md` を読み込む
+1. `docs/domains/{domain}/detaildesign-be.md` を読み込む
 2. `.task/` ディレクトリを確認する（なければ作成）
 3. 実装を以下の単位でタスクに分割する:
    - define/ 全体 → 1 タスク
@@ -245,7 +245,7 @@ YAML 要素記法:
 前提条件: 該当の impl-{task_number}.prog.md が存在すること
 
 1. `docs/conventions/` を読み込む（セッション中に未読の場合）
-2. `docs/domains/{domain}/detaildesign.md` を読み込む
+2. `docs/domains/{domain}/detaildesign-be.md` を読み込む
 3. `.task/impl-{task_number}.prog.md` を読み込む
 4. 依存タスクが完了済み（.done.md）か確認する。未完了なら警告する
 5. **テストファースト — /test コマンドを順次実行する:**
@@ -254,7 +254,7 @@ YAML 要素記法:
    c. `/test generate {domain} {layer}` を実行: テストコードを生成
    d. コミットする（テストは FAIL する状態で OK）
 6. **実装コードを書く:**
-   - detaildesign.md のコードをベースに実装する
+   - detaildesign-be.md のコードをベースに実装する
    - conventions/ の規約に従う
    - 即時都度コミットする（小さく頻繁に）
 7. `/test run {domain} {layer}` を実行: テストを全 PASS にする
@@ -290,7 +290,7 @@ YAML 要素記法:
 
 前提条件: 全実装タスクが完了済みであること
 
-1. `detaildesign.md` のデプロイ設定セクションを読み込む
+1. `detaildesign-be.md` のデプロイ設定セクションを読み込む
 2. 事前チェック:
    - 全テスト通過確認（`go test ./...`）
    - .task/ 配下に .prog.md が残っていないか確認

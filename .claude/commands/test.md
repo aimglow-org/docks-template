@@ -37,7 +37,7 @@
    → No: 「進行中のタスクがありません」と報告して終了
    → Yes: メタ情報から domain と layer を読み取り、次へ
 
-2. `libs/domains/{domain}/backend/{layer}/testdata/` が存在しない or 空？
+2. `libs/domains/{domain}/backend-{tech}/{layer}/testdata/` が存在しない or 空？
    → Yes: `/test design {domain} {layer}` を実行
    → No: 次へ
 
@@ -45,7 +45,7 @@
    → Yes: `/test validate {domain} {layer}` を実行
    → No: 次へ
 
-4. `libs/domains/{domain}/backend/{layer}/*_test.go` が存在しない？
+4. `libs/domains/{domain}/backend-{tech}/{layer}/*_test.go` が存在しない？
    → Yes: `/test generate {domain} {layer}` を実行
    → No: 次へ
 
@@ -75,7 +75,7 @@ layer: `define`, `usecase`, `infrastructure`, `entrypoint`, `platform`
 | `domains/{domain}/def.yaml` | エンティティ定義（必須パラメータ特定） |
 | `domains/{domain}/rule.yaml` | ビジネスルール（状態遷移・不変条件） |
 | `domains/{domain}/fn-*.yaml` | 機能仕様（interface・エラーケース一覧） |
-| `domains/{domain}/detaildesign.md` | テスト方針・テストケース一覧 |
+| `domains/{domain}/detaildesign-be.md` | テスト方針・テストケース一覧 |
 
 1. 上記の必読ソースをすべて読み込む
 2. **test.spec.md を作成する（テスト3層管理の SSoT）:**
@@ -83,7 +83,7 @@ layer: `define`, `usecase`, `infrastructure`, `entrypoint`, `platform`
    - テスト戦略（data-driven / integration / e2e）を明記する
    - 期待結果の概要を記述する
    - 配置先: `docs/domains/{domain}/.task/test.spec.md`
-3. detaildesign.md のテスト方針セクションに基づき、テストケースを洗い出す
+3. detaildesign-be.md のテスト方針セクションに基づき、テストケースを洗い出す
 4. **test-coverage.yaml のチェックリストを参照し、以下を網羅する:**
    - 正常系: 基本正常系、バリエーション、組み合わせ
    - 異常系: 入力バリデーション、ビジネスルール違反、リソース不在
@@ -99,7 +99,7 @@ layer: `define`, `usecase`, `infrastructure`, `entrypoint`, `platform`
 | entrypoint | e2e | mcp-server | usecase をモック |
 | platform | integration | postgres/gcs | 不要（実サービス） |
 
-5. `libs/domains/{domain}/backend/{layer}/testdata/` に YAML を作成する
+5. `libs/domains/{domain}/backend-{tech}/{layer}/testdata/` に YAML を作成する
 6. 各テストケースに以下を含める:
    - テストケース名（日本語、観点が分かる名前）
    - strategy（type, requires）
@@ -234,14 +234,14 @@ func TestSaveEntity(t *testing.T) {
 
 **指定層のテストを実行する。**
 
-1. 対象ディレクトリを特定: `libs/domains/{domain}/backend/{layer}/`
+1. 対象ディレクトリを特定: `libs/domains/{domain}/backend-{tech}/{layer}/`
 2. strategy に応じてテストを実行:
 
 | strategy | コマンド |
 |---|---|
-| data-driven | `go test ./libs/domains/{domain}/backend/{layer}/...` |
-| integration | `go test -tags=integration ./libs/domains/{domain}/backend/{layer}/...` |
-| e2e | `go test -tags=e2e ./libs/domains/{domain}/backend/{layer}/...` |
+| data-driven | `go test ./libs/domains/{domain}/backend-{tech}/{layer}/...` |
+| integration | `go test -tags=integration ./libs/domains/{domain}/backend-{tech}/{layer}/...` |
+| e2e | `go test -tags=e2e ./libs/domains/{domain}/backend-{tech}/{layer}/...` |
 
 3. 結果を整理して報告:
    - PASS / FAIL の件数

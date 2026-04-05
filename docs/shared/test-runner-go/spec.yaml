@@ -120,7 +120,7 @@
         - i: "各ドメインの _test.go で「モック構造体」を定義する"
         - i: "モック構造体は MockSet の振る舞い設定を受け取る adapter を持つ"
         - i: |
-            // 例: dialogue/backend/usecase/save_dialogue_test.go
+            // 例: dialogue/backend-go/usecase/save_dialogue_test.go
             type mockDialogueRepo struct {
                 storeFunc func(ctx context.Context, d define.Dialogue) error
                 calls     []mockCall
@@ -172,7 +172,7 @@
       c:
         - i: |
             go run ./libs/shared/test-runner-go/cmd/validate/ \
-              --testdata ./libs/domains/dialogue/backend/usecase/testdata/ \
+              --testdata ./libs/domains/dialogue/backend-go/usecase/testdata/ \
               --def ./docs/domains/dialogue/def.yaml \
               --rule ./docs/domains/dialogue/rule.yaml \
               --fn ./docs/domains/dialogue/fn-dialogue-save.yaml \

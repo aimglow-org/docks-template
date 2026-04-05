@@ -30,7 +30,7 @@
   ├── apps/                   ← デプロイ可能なアプリケーション
   ├── libs/
   │   ├── domains/            ← ドメインロジック（DDD bounded contexts）
-  │   │   └── {domain}/backend/
+  │   │   └── {domain}/backend-{tech}/
   │   │       ├── define/     ← 型・インターフェース（SDD 契約）
   │   │       ├── usecase/    ← ビジネスロジック
   │   │       ├── infrastructure/ ← 外部依存の実装
@@ -165,7 +165,7 @@
    - def.yaml, rule.yaml, store.yaml, ref.yaml, schema.yaml（空テンプレート）
 5. ディレクトリ骨格
    - apps/（要件に応じた apps を作成。UI ありの場合は apps/mock-{project}-next/ or flutter/ も作成）
-   - libs/domains/{domain}/backend/{define,usecase,infrastructure,entrypoint}/（空ディレクトリ）
+   - libs/domains/{domain}/backend-{tech}/{define,usecase,infrastructure,entrypoint}/（空ディレクトリ）
    - libs/platform/（要件に応じた platform パッケージ名でディレクトリ作成）
    - libs/shared/（test-runner-go/ 等）
    - libs/api-schema/（orphan branch から同期。初期は空ディレクトリ + .gitkeep）
@@ -217,7 +217,7 @@
 1. docs/domains/{name}/ に空 YAML テンプレートを生成
    - def.yaml — ドメイン概要 + エンティティ列挙（ヒアリング結果から）
    - rule.yaml, store.yaml, ref.yaml, schema.yaml（空テンプレート）
-2. libs/domains/{name}/backend/{define,usecase,infrastructure,entrypoint}/ を作成
+2. libs/domains/{name}/backend-{tech}/{define,usecase,infrastructure,entrypoint}/ を作成
 3. コミットする
 
 **Phase 3: 次のステップ提案**
