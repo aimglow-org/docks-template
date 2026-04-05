@@ -1,0 +1,20 @@
+{
+  "name": "internal-ci",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "plugins/internal-ci/src",
+  "projectType": "library",
+  "targets": {
+    "setup-auth": {
+      "executor": "@{{org}}/internal-ci:setup-auth",
+      "description": "Ensure GCP credentials are set up"
+    },
+    "lint": {
+      "executor": "@nx/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["plugins/internal-ci/**/*.ts"]
+      }
+    }
+  },
+  "tags": ["scope:plugin", "type:ci"]
+}

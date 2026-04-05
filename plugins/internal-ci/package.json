@@ -1,0 +1,9 @@
+{
+  "name": "@{{org}}/internal-ci",
+  "version": "0.0.1",
+  "main": "src/index.js",
+  "executors": "./executors.json",
+  "dependencies": {
+    "@nx/devkit": "^16.0.0"
+  }
+}

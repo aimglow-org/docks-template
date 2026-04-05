@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/schema",
+  "type": "object",
+  "cli": "nx",
+  "title": "Sync API Schema",
+  "description": "Syncs generated code and mocks from the api-schema orphan branch.",
+  "properties": {
+    "branch": {
+      "type": "string",
+      "description": "Source branch name",
+      "default": "api-schema"
+    }
+  },
+  "required": []
+}

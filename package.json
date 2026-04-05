@@ -3,7 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "api-schema:sync": "node tools/api-schema-sync.js"
+    "setup:auth": "nx run internal-ci:setup-auth",
+    "sync:schema": "nx run api-schema:sync",
+    "api-schema:sync": "nx run api-schema:sync"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@nx/devkit": "^16.0.0",
+    "nx": "^16.0.0",
+    "typescript": "^5.0.0"
+  }
 }
