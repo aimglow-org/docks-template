@@ -203,30 +203,12 @@
         - i: "エラーは fmt.Errorf(\"サービス名: 操作名: %w\", err) で標準化。SDK 固有のエラー型を外に漏らさない"
         - i: "コンストラクタ: NewClient(ctx context.Context) (*Client, error)。環境変数から接続先を解決する"
         - i: "各メソッドは context.Context を第1引数、error を最終戻り値とする"
-    - i: "Go コード実装パターン（client.go）"
+    - i: "client.go 実装ルール"
       c:
-        - i: |
-            // 構造体: 外部 SDK のクライアントをラップ
-            type Client struct {
-                client *sdkpackage.Client
-            }
-
-            // コンストラクタ: SDK 初期化。エミュレータ環境変数があれば自動切替
-            func NewClient(ctx context.Context) (*Client, error) {
-                // GCP 系 SDK は環境変数でエミュレータに自動接続
-                // 例: Firebase は FIREBASE_AUTH_EMULATOR_HOST, Pub/Sub は PUBSUB_EMULATOR_HOST
-                // コード側に if emulator {} else {} の分岐は書かない
-                return &Client{client: sdkClient}, nil
-            }
-
-            // メソッド: SDK 呼び出しをラップし、エラーを標準化
-            func (c *Client) DoSomething(ctx context.Context, param string) (string, error) {
-                result, err := c.client.SdkMethod(ctx, param)
-                if err != nil {
-                    return "", fmt.Errorf("サービス名: do something: %w", err)
-                }
-                return result.Value, nil
-            }
+        - i: "Client struct は外部 SDK のクライアントを1つだけラップする"
+        - i: "NewClient(ctx) は SDK 初期化のみ。エミュレータ分岐は書かない（SDK の環境変数自動切替に任せる）"
+        - i: "各メソッドは SDK 呼び出し → エラーを fmt.Errorf(\"サービス名: 操作名: %w\", err) でラップして返す"
+        - i: "SDK 固有の型をそのまま返さない。プリミティブ型（string, bool, []byte 等）に変換して返す"
     - i: "エミュレータ/モック接続の仕組み"
       c:
         - i: "GCP 系 SDK（Firebase, Pub/Sub 等）は環境変数でエミュレータに自動切替する"
@@ -274,21 +256,7 @@
     - i: "integration テストパターン（client_test.go）"
       c:
         - i: "//go:build integration タグ必須"
-        - i: "setup 関数: 環境変数チェック → 未設定なら t.Skip → Client 生成"
-          c:
-            - i: |
-                func setupClient(t *testing.T) *Client {
-                    t.Helper()
-                    if os.Getenv("FIREBASE_AUTH_EMULATOR_HOST") == "" {
-                        t.Skip("FIREBASE_AUTH_EMULATOR_HOST not set; skipping")
-                    }
-                    if os.Getenv("GCLOUD_PROJECT") == "" {
-                        os.Setenv("GCLOUD_PROJECT", "demo-{project}")
-                    }
-                    client, err := NewClient(context.Background())
-                    if err != nil { t.Fatalf("NewClient: %v", err) }
-                    return client
-                }
+        - i: "setup 関数: 環境変数チェック（未設定なら t.Skip）→ NewClient で Client 生成"
         - i: "テストデータ作成: Admin SDK でデータ作成 + t.Cleanup で削除"
         - i: "Firebase IDToken 取得: エミュレータ REST API で signIn（Admin SDK では IDToken を直接取得できない）"
           c:
@@ -322,10 +290,10 @@
 - i: "実装の原則"
   c:
     - i: "define/ を先に書く。他の層は define/ に従う"
-    - i: "1コミット = 1���の意味のある変更"
+    - i: "1コミット = 1つの意味のある変更"
     - i: "コンパイルが通らない状態でコミットしない"
-    - i: "テス���が通らない状態で次の層に進まない"
-    - i: "迷った�� Solviento に戻る。Dock で方針判断しない"
+    - i: "テストが通らない状態で次の層に進まない"
+    - i: "迷ったらユーザーに確認する。セッション内で方針判断しない"
 
 - i: "レビュー連携"
   c:
