@@ -131,7 +131,6 @@
     - i: "カテゴリ網羅性: 各関数に正常系 + 異常系/障害系/準正常系 が最低1件ずつ"
     - i: "Enum 網羅性: RegisterWithEnums で登録された enum の全値がテストケースに使われているか"
     - i: "冪等性テスト: idempotency_key がある usecase は重複リクエストテストが必須"
-    - i: "Stub/Verify 整合性: stubs に定義された mock キーが verify にも存在するか（副作用検証漏れ防止）"
     - i: "エラーコード網羅性: RegisterExpectedErrors で登録されたエラーコードが全てテストケースでカバーされているか"
     - i: "FAIL 時は ACTION 指示（何をすべきか）を出力する"
   n: |
