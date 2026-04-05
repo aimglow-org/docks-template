@@ -190,7 +190,136 @@
         - i: "中規模以上（複数ドメイン、FE あり）: ドメインごとにセッション分離"
   n: "セッション分離はプロジェクト規模に応じて適用する。小規模なら不要"
 
-- i: "実��の原則"
+- i: "Platform 外部サービスクライアント実装パターン"
+  c:
+    - i: "ファイル構成（全 platform パッケージ共通）"
+      c:
+        - i: "client.go — 外部 SDK ラッパー"
+        - i: "client_test.go — integration テスト（//go:build integration）"
+    - i: "実装ルール"
+      c:
+        - i: "interface は platform/ に定義しない。domain の define/ 層に Service Port として定義する"
+        - i: "platform/ の Client struct は interface を知らない。構造的適合（structural conformance）で満たす"
+        - i: "エラーは fmt.Errorf(\"サービス名: 操作名: %w\", err) で標準化。SDK 固有のエラー型を外に漏らさない"
+        - i: "コンストラクタ: NewClient(ctx context.Context) (*Client, error)。環境変数から接続先を解決する"
+        - i: "各メソッドは context.Context を第1引数、error を最終戻り値とする"
+    - i: "Go コード実装パターン（client.go）"
+      c:
+        - i: |
+            // 構造体: 外部 SDK のクライアントをラップ
+            type Client struct {
+                client *sdkpackage.Client
+            }
+
+            // コンストラクタ: SDK 初期化。エミュレータ環境変数があれば自動切替
+            func NewClient(ctx context.Context) (*Client, error) {
+                // GCP 系 SDK は環境変数でエミュレータに自動接続
+                // 例: Firebase は FIREBASE_AUTH_EMULATOR_HOST, Pub/Sub は PUBSUB_EMULATOR_HOST
+                // コード側に if emulator {} else {} の分岐は書かない
+                return &Client{client: sdkClient}, nil
+            }
+
+            // メソッド: SDK 呼び出しをラップし、エラーを標準化
+            func (c *Client) DoSomething(ctx context.Context, param string) (string, error) {
+                result, err := c.client.SdkMethod(ctx, param)
+                if err != nil {
+                    return "", fmt.Errorf("サービス名: do something: %w", err)
+                }
+                return result.Value, nil
+            }
+    - i: "エミュレータ/モック接続の仕組み"
+      c:
+        - i: "GCP 系 SDK（Firebase, Pub/Sub 等）は環境変数でエミュレータに自動切替する"
+        - i: "Firebase Auth: FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 → SDK が自動でエミュレータに接続"
+        - i: "Pub/Sub: PUBSUB_EMULATOR_HOST=localhost:8085 → 同様に自動切替"
+        - i: "エミュレータがない外部 API（LINE, Twilio, Stripe 等）: httptest.Server でモックサーバーを立てる"
+        - i: "重要: コード側に if emulator {} else {} の分岐は書かない。SDK の環境変数自動切替を使う"
+    - i: "Firebase Auth Emulator の起動方法"
+      c:
+        - i: "Docker Compose サービスとして起動する"
+        - i: "Dockerfile.firebase-emulator:"
+          c:
+            - i: |
+                FROM node:20-slim
+                RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+                RUN npm install -g firebase-tools
+                WORKDIR /app
+                COPY firebase.json .
+                EXPOSE 9099 4000
+                CMD ["firebase", "emulators:start", "--only", "auth", "--project", "demo-{project}"]
+        - i: "firebase.json:"
+          c:
+            - i: |
+                {
+                  "emulators": {
+                    "auth": { "host": "0.0.0.0", "port": 9099 },
+                    "ui": { "enabled": true, "host": "0.0.0.0", "port": 4000 }
+                  }
+                }
+        - i: "docker-compose.yml の firebase-emulator サービス:"
+          c:
+            - i: |
+                firebase-emulator:
+                  build:
+                    context: .
+                    dockerfile: Dockerfile.firebase-emulator
+                  ports: ["9099:9099"]
+                  healthcheck:
+                    test: ["CMD-SHELL", "curl -f http://localhost:9099/ || exit 1"]
+                    interval: 5s
+                    timeout: 3s
+                    retries: 10
+                    start_period: 15s
+        - i: "Go から接続: FIREBASE_AUTH_EMULATOR_HOST=localhost:9099, GCLOUD_PROJECT=demo-{project}"
+    - i: "integration テストパターン（client_test.go）"
+      c:
+        - i: "//go:build integration タグ必須"
+        - i: "setup 関数: 環境変数チェック → 未設定なら t.Skip → Client 生成"
+          c:
+            - i: |
+                func setupClient(t *testing.T) *Client {
+                    t.Helper()
+                    if os.Getenv("FIREBASE_AUTH_EMULATOR_HOST") == "" {
+                        t.Skip("FIREBASE_AUTH_EMULATOR_HOST not set; skipping")
+                    }
+                    if os.Getenv("GCLOUD_PROJECT") == "" {
+                        os.Setenv("GCLOUD_PROJECT", "demo-{project}")
+                    }
+                    client, err := NewClient(context.Background())
+                    if err != nil { t.Fatalf("NewClient: %v", err) }
+                    return client
+                }
+        - i: "テストデータ作成: Admin SDK でデータ作成 + t.Cleanup で削除"
+        - i: "Firebase IDToken 取得: エミュレータ REST API で signIn（Admin SDK では IDToken を直接取得できない）"
+          c:
+            - i: "POST http://{host}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-api-key"
+            - i: "リクエスト: {\"email\":\"...\",\"password\":\"...\",\"returnSecureToken\":true}"
+            - i: "レスポンス: {\"idToken\":\"...\"}（これを VerifyIDToken のテストに使う）"
+        - i: "エミュレータ全データ削除: DELETE http://{host}/emulator/v1/projects/{projectID}/accounts"
+        - i: "エミュレータ接続エラー時は t.Skip（connection reset by peer → テスト環境の問題であり FAIL にしない）"
+    - i: "新規 platform パッケージ追加手順"
+      c:
+        - i: "1. client.go: 上記 Go コードパターンに従い SDK ラッパーを実装"
+        - i: "2. client_test.go: 上記 integration テストパターンに従いテストを実装"
+        - i: "3. エミュレータが必要な場合: Docker Compose にサービスを追加（firebase-emulator パターンを踏襲）"
+        - i: "4. domain の define/ 層に Service Port interface を定義（domain が platform を import しない）"
+        - i: "5. domain の infrastructure/ で Client を DI する"
+  n: "このパターンに従えば、外部サービスのエミュレータ接続・テスト・本番切替が環境変数だけで完結する"
+
+- i: "テストデータ配置ルール"
+  c:
+    - i: "DB テストデータ"
+      c:
+        - i: "integration テスト内の Go コードで INSERT する（YAML 定義ではない）"
+        - i: "setup/teardown は t.Cleanup + トランザクションロールバック or TRUNCATE"
+    - i: "エミュレータ テストデータ"
+      c:
+        - i: "テスト内でエミュレータ API を使って作成・削除する"
+        - i: "永続的なテストフィクスチャファイルは使わない"
+    - i: "seed データ（開発用初期データ）はテストデータとは分離して管理する"
+  n: "テストデータは全てテストコード内で作成・破棄する。再現可能性を保証"
+
+- i: "実装の原則"
   c:
     - i: "define/ を先に書く。他の層は define/ に従う"
     - i: "1コミット = 1���の意味のある変更"
