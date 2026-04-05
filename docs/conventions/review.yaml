@@ -10,6 +10,42 @@
     - i: "各 Agent は独立してレビューし、結果を統合する"
     - i: "ドメインを跨ぐ変更は整合性レビューを追加する"
 
+- i: "4段階検証プロセス"
+  c:
+    - i: "Step 0: 機械検証（Agent 不要）"
+      c:
+        - i: "golangci-lint run（exhaustruct, errcheck, gosec, unused, staticcheck）"
+        - i: "go test（dto 全フィールド非ゼロテスト含む）"
+        - i: "go build"
+      n: "全 PASS が Step 1 の前提条件。機械で検出可能な問題を先に弾く"
+    - i: "Step 1: 観点別ラウンド（1 Agent = 1 観点、順次実行）"
+      c:
+        - i: "Round 1: SEC（セキュリティ 5項目）"
+        - i: "Round 2: INV（不変条件 6項目）"
+        - i: "Round 3: ERR（エラー伝播 5項目）"
+        - i: "Round 4: ALN（設計書整合 6項目）"
+        - i: "Round 5〜: レビュー種別に応じて TST, SHR, PLT, ABS, EVT を追加"
+      n: "1 Agent に 3〜6 項目のみ。注意力の分散を防ぐ。各ラウンドの指摘を修正してから次へ"
+    - i: "Step 2: ロール×レイヤー別レビュー（1 Agent = 1 ロール×1 レイヤー）"
+      c:
+        - i: "Go ハッカー + DDD アーキテクト × define 層"
+        - i: "Go ハッカー × usecase 層"
+        - i: "DBA × infrastructure 層"
+        - i: "FE エンジニア × entrypoint 層"
+        - i: "Proto/gRPC エンジニア × interpoint 層"
+        - i: "シニアアーキテクト × 全体横断"
+      n: "観点リストを渡さない。専門家として自由に問題を探す。Step 1 で見つからない問題を立体的に検出"
+    - i: "Step 3: 複数システム担当者ロール並列レビュー（最終ゲート）"
+      c:
+        - i: "全ロールを同時起動、全レイヤーを横断"
+        - i: "Step 1〜2 の修正反映確認 + 見落としの最終確認"
+      n: "従来の /rev 複数ロール並列方式。最終ゲートとして実施"
+  n: |
+    demaetei Identity ドメインでの実証結果:
+    - 旧方式（1 Agent に 20+ 観点）: 36件の指摘を6ラウンドで発見
+    - 新方式（4段階）: 機械検証で75%を即検出、残り5件を1ラウンドで発見
+    各 Step は前の Step が PASS してから進む。tech debt にしない（全件修正）。
+
 - i: "ロール定義"
   c:
     - i: "senior-architect（シニアアーキテクト）"
