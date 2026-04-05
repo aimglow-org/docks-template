@@ -137,13 +137,19 @@ YAML 要素記法:
    - デプロイ設定
    - 依存ライブラリ（domain / platform / apps に分類）
    - テスト方針（テストケース一覧）
-3. 曖昧チェック: 以下の表現が含まれていないか検証する
+3. **test.spec.md を作成する（テスト3層管理の SSoT）:**
+   - 配置先: `docs/domains/{domain}/.task/test.spec.md`
+   - detaildesign-be.md のテスト方針セクションをベースに、全テストケースを自然言語で記述する
+   - 各ケースにテスト戦略（data-driven / integration / e2e）を明記する
+   - 期待結果の概要を記述する
+   - test.spec.md が後続の testdata/*.yaml と *_test.go の源泉となる
+4. 曖昧チェック: 以下の表現が含まれていないか検証する
    - 「〜する予定」「〜かもしれない」「〜を検討」「必要に応じて」「おそらく」「など」
    - 見つかった場合は確定表現に書き換える
-4. コミットする
-5. 完了後、`/rev detail-design` の実行を提案する
+5. コミットする
+6. 完了後、`/rev detail-design` の実行を提案する
 
-完了条件: detaildesign-be.md が作成され、曖昧表現が 0 件であること。
+完了条件: detaildesign-be.md と test.spec.md が作成され、曖昧表現が 0 件であること。
 
 ---
 
@@ -215,24 +221,36 @@ YAML 要素記法:
 
 **実装タスクを作成する。**
 
-前提条件: detaildesign-be.md が存在すること
+前提条件: detaildesign-be.md が存在すること（FE タスクの場合は detaildesign-fe.md も）
 
 1. `docs/domains/{domain}/detaildesign-be.md` を読み込む
-2. `.task/` ディレクトリを確認する（なければ作成）
-3. 実装を以下の単位でタスクに分割する:
+2. `docs/domains/{domain}/detaildesign-fe.md` を読み込む（存在する場合）
+3. `.task/` ディレクトリを確認する（なければ作成）
+4. 実装を以下の単位でタスクに分割する:
+
+   **BE タスク（001〜099 番台）:**
    - define/ 全体 → 1 タスク
    - usecase/ の各ユースケース → 各 1 タスク
    - infrastructure/ の各 Repository → 各 1 タスク
    - platform/ の各クライアント → 各 1 タスク
    - entrypoint/ → 1 タスク
    - main.go（DI 組み立て） → 1 タスク
-4. 各タスクを `impl-{nnn}.prog.md` として作成する。
-   テンプレートは `conventions/implementation.yaml` の「テンプレート（必須フィールド）」に従う。
-   **必ず メタ情報（domain, layer, review）を正確に記載すること。**
-   `/rev`（引数なし）はこのメタ情報から自動でレビュー種別を決定する。
 
-5. タスク一覧をユーザーに提示する
-6. コミットする
+   **FE タスク（101〜199 番台、detaildesign-fe.md が存在する場合）:**
+   - Design System（primitives + composites） → 1 タスク
+   - state/（hooks） → 1 タスク
+   - api/（API ラッパー） → 1 タスク
+   - components/（ドメインコンポーネント） → 1 タスク
+   - App pages/（画面合成 + e2e） → 1 タスク
+
+5. 各タスクを `impl-{nnn}.prog.md` として作成する。
+   テンプレートは `conventions/implementation.yaml` の「テンプレート（必須フィールド）」に従う。
+   **必ず メタ情報（domain, layer, scope, review）を正確に記載すること。**
+   - scope: `be` または `fe`（FE タスクには必ず `scope: fe` を記載）
+   - `/rev`（引数なし）はこのメタ情報から自動でレビュー種別を決定する。
+
+6. タスク一覧をユーザーに提示する
+7. コミットする
 
 完了条件: 全タスクが .task/ に作成され、コミット済みであること。
 
@@ -245,41 +263,70 @@ YAML 要素記法:
 前提条件: 該当の impl-{task_number}.prog.md が存在すること
 
 1. `docs/conventions/` を読み込む（セッション中に未読の場合）
-2. `docs/domains/{domain}/detaildesign-be.md` を読み込む
-3. `.task/impl-{task_number}.prog.md` を読み込む
-4. 依存タスクが完了済み（.done.md）か確認する。未完了なら警告する
-5. **テストファースト — /test コマンドを順次実行する:**
-   a. `/test design {domain} {layer}` を実行: testdata/*.yaml を作成
+2. `.task/impl-{task_number}.prog.md` を読み込み、メタ情報から **scope（be/fe）** を判定する
+3. `docs/domains/{domain}/.task/test.spec.md` を読み込む（テスト仕様の SSoT）
+4. scope に応じた detaildesign を読み込む:
+   - scope=be: `docs/domains/{domain}/detaildesign-be.md`
+   - scope=fe: `docs/domains/{domain}/detaildesign-fe.md`
+5. 依存タスクが完了済み（.done.md）か確認する。未完了なら警告する
+
+**scope=be の場合:**
+
+6. **テストファースト — /test コマンドを順次実行する:**
+   a. `/test design {domain} {layer}` を実行: test.spec.md に基づき testdata/*.yaml を作成
    b. `/test validate {domain} {layer}` を実行: 網羅性検証。error が 0 件になるまで修正
    c. `/test generate {domain} {layer}` を実行: テストコードを生成
    d. コミットする（テストは FAIL する状態で OK）
-6. **実装コードを書く:**
+7. **実装コードを書く:**
    - detaildesign-be.md のコードをベースに実装する
    - conventions/ の規約に従う
    - 即時都度コミットする（小さく頻繁に）
-7. `/test run {domain} {layer}` を実行: テストを全 PASS にする
-8. タスクファイルの完了条件をチェックする
-9. タスクファイルを `impl-{task_number}.done.md` にリネームする
-10. 完了メモを記入する
-11. コミットする
-12. 該当レイヤーの `/rev impl-{layer}` の実行を提案する
+8. `/test run {domain} {layer}` を実行: テストを全 PASS にする
 
-**テストファーストの原則:**
+**scope=fe の場合:**
+
+6. **テストファースト — /test fe-* コマンドを順次実行する:**
+   a. `/test fe-design {domain} {fe-layer}` を実行: test.spec.md に基づき testdata/*.yaml を作成
+   b. `/test fe-validate {domain} {fe-layer}` を実行: 網羅性検証。error が 0 件になるまで修正
+   c. `/test fe-generate {domain} {fe-layer}` を実行: テストコードを生成
+   d. コミットする（テストは FAIL する状態で OK）
+7. **実装コードを書く:**
+   - detaildesign-fe.md の設計をベースに実装する
+   - conventions/ の規約に従う
+   - 即時都度コミットする（小さく頻繁に）
+8. `/test fe-run {domain} {fe-layer}` を実行: テストを全 PASS にする
+
+**共通（scope=be/fe 問わず）:**
+
+9. タスクファイルの完了条件をチェックする
+10. タスクファイルを `impl-{task_number}.done.md` にリネームする
+11. 完了メモを記入する
+12. コミットする
+13. 該当レイヤーの `/rev` の実行を提案する
+
+**テストファーストの原則（BE/FE 共通）:**
 - テストデータ（YAML）→ テストコード → 実装コード の順で書く
 - テストが RED（失敗）の状態からスタートし、GREEN（成功）にする
 - テスト PASS 後にリファクタリング（テストは通ったまま）
 
-実装順序の制約:
+**BE 実装順序の制約:**
 - define/ → usecase/ → infrastructure/ → entrypoint/ の順で実装する
 - interpoint/ は entrypoint/ と並行または後に実装する（ドメイン間通信がある場合のみ）
 - usecase/dto/ は interpoint/ または gRPC 接続が必要になった時点で実装する
 - platform/ は infrastructure/ より先に実装する
 - 前の層のテストが通るまで次の層に進まない
 
+**FE 実装順序の制約:**
+- Design System（Layer 1）→ state/ + api/（Layer 2）→ components/（Layer 2）→ App pages/（Layer 3）の順で実装する
+- Design System は全ドメインの FE より先に完了させる
+- state/ と api/ は並行実装可。components/ はこれらに依存するため後に実装する
+- 前の層のテストが通るまで次の層に進まない
+
 **ドメイン実装セッションのスコープ制約:**
 - libs/domains/{domain}/ 内の実装に集中する
-- apps/ の main.go、docker-compose、seed データはスコープ外
-- 引き渡し: entrypoint/ に register.go（ハンドラ登録関数）を作成し、Integration セッションで組み立てる
+- apps/ の main.go、docker-compose、seed データはスコープ外（BE）
+- apps/ の pages/ は FE Layer 3 タスクとして別タスクにする
+- 引き渡し: entrypoint/ に register.go（BE）、components/ の export（FE）を作成し、Integration セッションで組み立てる
 - 小規模（ドメイン1つ）の場合はこの制約を緩和してよい
 
 ---
@@ -311,7 +358,7 @@ YAML 要素記法:
     ↓
 /rev basic-design              ← レビュー（任意だが推奨）
     ↓
-/imp detail-design {domain}
+/imp detail-design {domain}    ← detaildesign-be.md + detaildesign-fe.md + test.spec.md
     ↓
 /rev detail-design             ← レビュー（任意だが推奨）
     ↓
@@ -321,34 +368,49 @@ YAML 要素記法:
     ↓                             ※ UI なしの場合はスキップ
 /imp task {domain}
     ↓
-/imp code {domain} 001         ← define/（テストファースト: YAML→テスト→実装）
+    ├─── BE タスク ──────────────────────────────────────────
+    │
+    │  /imp code {domain} 001      ← define/（テストファースト: YAML→テスト→実装）
+    │      ↓
+    │  /rev impl-define            ← レビュー
+    │      ↓
+    │  /imp code {domain} 002      ← usecase（テストファースト）
+    │  /imp code {domain} 003
+    │      ↓
+    │  /rev impl-usecase           ← レビュー
+    │  /rev test-design            ← テストデータレビュー
+    │      ↓
+    │  /imp code {domain} 004      ← platform
+    │      ↓
+    │  /imp code {domain} 005      ← infrastructure（テストファースト）
+    │      ↓
+    │  /rev impl-infrastructure    ← レビュー
+    │      ↓
+    │  /imp code {domain} 006      ← entrypoint（テストファースト）
+    │      ↓
+    │  /rev impl-entrypoint        ← レビュー
+    │      ↓
+    │  /imp code {domain} 007      ← interpoint（ドメイン間通信がある場合のみ）
+    │      ↓
+    │  /rev impl-interpoint        ← レビュー（該当時のみ）
+    │      ↓
+    │  /imp code {domain} 008      ← main.go / register.go
+    │
+    ├─── FE タスク（UI ありの場合）─────────────────────────
+    │
+    │  /imp code {domain} 101      ← Design System（テストファースト: fe-design→fe-generate→実装）
+    │      ↓
+    │  /imp code {domain} 102      ← state/ + api/（テストファースト）
+    │      ↓
+    │  /imp code {domain} 103      ← components/（テストファースト）
+    │      ↓
+    │  /rev test-design            ← FE テストデータレビュー
+    │      ↓
+    │  /imp code {domain} 104      ← App pages/（e2e テスト）
+    │
+    └───────────────────────────────────────────────────────
     ↓
-/rev impl-define               ← レビュー
-    ↓
-/imp code {domain} 002         ← usecase（テストファースト）
-/imp code {domain} 003
-    ↓
-/rev impl-usecase              ← レビュー
-/rev test-design               ← テストデータレビュー
-    ↓
-/imp code {domain} 004         ← platform
-    ↓
-/imp code {domain} 005         ← infrastructure（テストファースト）
-    ↓
-/rev impl-infrastructure       ← レビュー
-    ↓
-/imp code {domain} 006         ← entrypoint（テストファースト）
-    ↓
-/rev impl-entrypoint           ← レビュー
-    ↓
-/imp code {domain} 007         ← interpoint（ドメイン間通信がある場合のみ）
-    ↓
-/rev impl-interpoint           ← レビュー（該当時のみ）
-    ↓
-/imp code {domain} 008         ← main.go / register.go
-    ↓
-    ↓
-/test ci                       ← 全テスト実行
+/test ci                       ← 全テスト実行（BE + FE）
     ↓
 /imp deploy
     ↓

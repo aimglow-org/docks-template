@@ -1,5 +1,5 @@
 # testing.yaml — テスト規約
-# TDD に基づく紬プロジェクトのテストルール
+# TDD に基づくテストルール（BE/FE 共通）
 # 要素記法: i(アイテム — 全要素の基本), c(子要素リスト — i の下にネスト), n(ノート — 補足説明)
 
 - i: "テストファースト原則"
@@ -9,29 +9,33 @@
     - i: "テストが通ることを実装の完了条件とする"
   n: "TDD: テストデータ定義 → テストコード → 実装コード の順"
 
-- i: "テスト3層管理（test.spec.md → YAML → Go テストランナー）"
+- i: "テスト3層管理（test.spec.md → YAML → テストランナー）"
   c:
     - i: "test.spec.md — 人間可読のテスト仕様（SSoT）"
       c:
-        - i: "配置先: docs/domains/{domain}/.task/ または detaildesign-be.md のテスト方針セクション"
+        - i: "配置先: docs/domains/{domain}/.task/test.spec.md"
+        - i: "作成タイミング: /imp detail-design で detaildesign-be.md / detaildesign-fe.md と同時に作成する"
         - i: "内容: テストケース一覧、テスト戦略、期待結果の自然言語記述"
-        - i: "作成タイミング: /test design の最初に作成する"
+        - i: "BE と FE のテストケースを同一ファイル内でセクション分けする"
         - i: "/rev test-design でレビュー対象になる"
       n: "test.spec.md が「何をテストするか」の源泉。YAML は「どうテストするか」の実装"
     - i: "testdata/*.yaml — 機械可読のテストデータ"
       c:
         - i: "test.spec.md のケースを YAML 形式に変換する"
-        - i: "test-runner-go の YAML ローダーが解釈可能な形式"
+        - i: "BE: test-runner-go の YAML ローダーが解釈可能な形式"
+        - i: "FE: テストランナー（Vitest 等）の YAML ローダーが解釈可能な形式"
       n: "test.spec.md → YAML の変換は CC が行う"
-    - i: "Go テストランナー — テスト実行"
+    - i: "テストランナー — テスト実行"
       c:
-        - i: "YAML を読み込み、テストを実行する"
-        - i: "test-runner-go のコンポーネントを使用する"
+        - i: "BE: Go test-runner-go（YAML を読み込みテストを実行）"
+        - i: "FE: Vitest + Testing Library（Next.js）/ Flutter test（Flutter）"
+      n: "ランナーの技術が異なるだけで、YAML を読み込んで実行する構造は共通"
     - i: "3層同期ルール"
       c:
         - i: "test.spec.md を変更したら YAML も更新する"
         - i: "YAML を変更したら test.spec.md との整合性を確認する"
         - i: "/rev の ALN（Alignment）チェックで3層の同期を検証する"
+        - i: "BE/FE 両方に適用する"
   n: "3層の同期が崩れるとテストの���頼性が低下する。/rev で検証する"
 
 - i: "テスト��ータ YAML のフォ���マット"
@@ -45,7 +49,7 @@
       n: "テストデータに限り flat 形式を標準とすることを推奨。Go テストランナーのパース実装が簡潔になる"
   n: "規約 YAML は i/c/n 記法を維持。テストデータ YAML の��� flat 形式を許容する"
 
-- i: "テストデータ構造（testdata/）"
+- i: "BE テストデータ構造（testdata/）"
   c:
     - i: "配置先"
       c:
@@ -90,7 +94,7 @@
                   n: "モックの呼び出し検証。data-driven で使用"
             - i: "n: テストケースの補足説明"
 
-- i: "テストカテゴリと層別方針"
+- i: "BE テストカテゴリと層別方針"
   c:
     - i: "define/ — 値オブジェクトテスト"
       c:
@@ -241,7 +245,7 @@
         - i: "実装完了後の最終品質確認"
         - i: "テストケースの妥当性と実装の正しさの両方が確認済み"
 
-- i: "Go テスト規約"
+- i: "BE Go テスト規約"
   c:
     - i: "ファイル配置"
       c:
@@ -267,6 +271,197 @@
                 }
             }
       n: "YAML からテストケースをロードし、テーブル駆動で回す"
+
+# ==================================================
+# FE テスト体系
+# ==================================================
+
+- i: "FE テスト体系"
+  n: "BE と同一の3層管理フロー（test.spec.md → testdata/*.yaml → テストランナー）を FE にも適用する"
+  c:
+    - i: "基本方針"
+      c:
+        - i: "テストファースト原則は BE と同一。test.spec.md → testdata → runner → review → 実装"
+        - i: "YAML data-driven パターンを最大限活用する（state テスト、API テスト、バリデーション）"
+        - i: "YAML で表現しにくいテスト（レンダリング、インタラクション）は runner 側で補完する"
+        - i: "test.spec.md は BE/FE 共通で1ファイル。セクション分けで管理する"
+    - i: "FE テストデータ構造（testdata/）"
+      c:
+        - i: "配置先"
+          c:
+            - i: "Layer 2（Domain FE）: libs/domains/{domain}/frontend-{tech}/{layer}/testdata/"
+            - i: "Layer 1（Design System）: libs/shared/design-system-{tech}/testdata/"
+          n: "BE と同じく、テスト対象コードと同じディレクトリに testdata/ を配置する"
+        - i: "ファイル命名"
+          c:
+            - i: "{対象名}.test.yaml"
+            - i: "例: use-orders.test.yaml, order-summary-card.test.yaml"
+    - i: "FE テスト strategy 分類"
+      c:
+        - i: "unit — 単体テスト（関数・hooks の入出力）"
+          c:
+            - i: "YAML data-driven: 可能"
+            - i: "対象: state/hooks/, api/ のラッパー関数、バリデーション関数"
+            - i: "requires: none"
+          n: "BE の data-driven と同構造。input → want で検証"
+        - i: "component — コンポーネントテスト（レンダリング + インタラクション）"
+          c:
+            - i: "YAML data-driven: 部分的に可能（props バリエーションは YAML で定義、レンダリング検証は runner）"
+            - i: "対象: components/ のドメインコンポーネント、Design System の primitives/composites"
+            - i: "requires: none（jsdom）"
+          n: "props パターンを YAML で定義し、render 結果の検証は Testing Library で行う"
+        - i: "integration — 結合テスト（API モック + 状態 + コンポーネント連携）"
+          c:
+            - i: "YAML data-driven: 可能（mock API レスポンスを YAML で定義）"
+            - i: "対象: state/ + components/ の連携、API レスポンス → 画面反映"
+            - i: "requires: none（MSW でモック）"
+          n: "BE の usecase テストに対応。mock(API response) → want(rendered state)"
+        - i: "e2e — エンドツーエンドテスト（ブラウザ操作）"
+          c:
+            - i: "YAML data-driven: シナリオ定義は YAML 可能、操作手順は runner"
+            - i: "対象: 画面遷移、フォーム送信、認証フロー"
+            - i: "requires: browser（Playwright）"
+          n: "BE の entrypoint e2e に対応。画面遷移・ユーザー操作のフロー検証"
+        - i: "visual — ビジュアルテスト（任意）"
+          c:
+            - i: "YAML data-driven: 不要（スナップショット比較）"
+            - i: "対象: Design System の primitives/composites"
+            - i: "requires: Storybook + Chromatic 等"
+          n: "YAGNI: デザイン品質担保が明確に必要になった時点で導入する"
+    - i: "FE レイヤー別テスト方針"
+      c:
+        - i: "Layer 1: Design System（libs/shared/design-system-{tech}/）"
+          c:
+            - i: "component テスト: 全 primitives/composites の props バリエーション"
+            - i: "a11y テスト: axe-core による自動検証（全コンポーネント必須）"
+            - i: "visual テスト: スナップショット（任意、導入時期はプロジェクト判断）"
+          n: "Design System は全ドメインの基盤。テストカバレッジを最も高く保つ"
+        - i: "Layer 2: Domain FE（libs/domains/{domain}/frontend-{tech}/）"
+          c:
+            - i: "state/ テスト"
+              c:
+                - i: "strategy: unit（data-driven）"
+                - i: "対象: hooks の入力 → 状態変化"
+                - i: "mock: API レスポンスを YAML で定義（MSW）"
+                - i: "want: 返却値、キャッシュ状態、エラーハンドリング"
+              n: "BE usecase テストと同構造。最も YAML data-driven が効く領域"
+            - i: "api/ テスト"
+              c:
+                - i: "strategy: unit（data-driven）"
+                - i: "対象: API ラッパーの入力変換・エラーマッピング"
+                - i: "mock: generated/ のレスポンスを YAML で定義"
+              n: "BE infrastructure テストに対応"
+            - i: "components/ テスト"
+              c:
+                - i: "strategy: component"
+                - i: "対象: ドメイン固有コンポーネントの props → レンダリング"
+                - i: "props パターンを YAML で定義、レンダリング検証は Testing Library"
+                - i: "インタラクション検証: ユーザー操作 → コールバック呼び出し / 状態変化"
+        - i: "Layer 3: App（apps/{app-name}/）"
+          c:
+            - i: "e2e テスト: 画面遷移、フォーム送信、認証フロー（Playwright）"
+            - i: "シナリオは YAML で定義可能（画面パス、入力値、期待遷移先）"
+          n: "App 層のテストは統合的。FE 実装の最終確認"
+    - i: "FE testdata YAML 構造"
+      c:
+        - i: "unit / integration（data-driven）"
+          c:
+            - i: |
+                # 例: use-orders.test.yaml
+                - name: "正常系_一覧取得"
+                  strategy:
+                    type: unit
+                    requires: none
+                  input:
+                    filters: { status: "active" }
+                  mock:
+                    api.listOrders:
+                      status: 200
+                      body: { orders: [{ id: "1", status: "active" }], total: 1 }
+                  want:
+                    error: null
+                    data.orders.length: 1
+                    data.orders[0].status: "active"
+                  side_effect:
+                    api.listOrders: called_once
+          n: "BE の testdata YAML と同じ構造。mock の対象が Repository → API になるだけ"
+        - i: "component テスト"
+          c:
+            - i: |
+                # 例: order-summary-card.test.yaml
+                - name: "正常系_アクティブ注文の表示"
+                  strategy:
+                    type: component
+                    requires: none
+                  input:
+                    props:
+                      order: { id: "1", status: "active", total: 1500 }
+                  want:
+                    renders:
+                      - text: "注文 #1"
+                      - text: "¥1,500"
+                      - testId: "status-badge"
+                        attribute: { "data-status": "active" }
+                - name: "インタラクション_キャンセルボタン"
+                  strategy:
+                    type: component
+                    requires: none
+                  input:
+                    props:
+                      order: { id: "1", status: "active", total: 1500 }
+                      onCancel: "mock_fn"
+                  interaction:
+                    - action: click
+                      target: { testId: "cancel-button" }
+                  want:
+                    onCancel: called_once
+          n: "props を YAML で定義し、レンダリング期待値とインタラクション結果を検証する"
+    - i: "FE テスト技術スタック"
+      c:
+        - i: "Next.js"
+          c:
+            - i: "テストランナー: Vitest"
+            - i: "コンポーネントテスト: @testing-library/react"
+            - i: "API モック: MSW（Mock Service Worker）"
+            - i: "E2E: Playwright"
+            - i: "a11y: @axe-core/react"
+            - i: "YAML ローダー: libs/shared/test-runner-next/ に実装（test-runner-go と対称）"
+        - i: "Flutter"
+          c:
+            - i: "テストランナー: flutter test"
+            - i: "Widget テスト: flutter_test"
+            - i: "API モック: mocktail / http_mock_adapter"
+            - i: "E2E: integration_test"
+            - i: "YAML ローダー: libs/shared/test-runner-flutter/ に実装"
+      n: "YAML ローダーは BE の test-runner-go と同じ設計思想。shared/ に配置して全ドメインで共有する"
+    - i: "FE テスト用共通パッケージ"
+      c:
+        - i: "libs/shared/test-runner-next/"
+          c:
+            - i: "yaml-loader.ts — testdata/*.yaml を TypeScript オブジェクトにパース"
+            - i: "render-asserter.ts — want.renders の検証（Testing Library ラッパー）"
+            - i: "interaction-runner.ts — interaction セクションの実行（userEvent ラッパー）"
+            - i: "mock-api.ts — mock セクションから MSW ハンドラを生成"
+          n: "test-runner-go と同じ役割。YAML からテスト実行を駆動する FE 版"
+        - i: "libs/shared/test-runner-flutter/（Flutter 採用時に作成）"
+      n: "YAGNI: test-runner-next/ は FE 実装開始時に作成する。スケルトンのみ先行配置しない"
+    - i: "FE テスト実行環境"
+      c:
+        - i: "ローカル PC"
+          c:
+            - i: "unit / component: npm test（Vitest、watch モード可）"
+            - i: "e2e: npx playwright test"
+        - i: "CI/CD（GitHub Actions）"
+          c:
+            - i: "unit / component: npm test -- --run"
+            - i: "e2e: Playwright のヘッドレスブラウザで実行"
+    - i: "BE テストとの対称性まとめ"
+      c:
+        - i: "BE data-driven ↔ FE unit — 入出力の機械的検証（YAML data-driven）"
+        - i: "BE integration ↔ FE integration — 外部依存をモックした結合テスト"
+        - i: "BE e2e ↔ FE e2e — エンドポイント / 画面の統合テスト"
+        - i: "BE test-runner-go ↔ FE test-runner-next — YAML ローダー + テスト実行基盤"
+      n: "フローは同一、技術が異なるだけ。test.spec.md → testdata → runner → review → 実装"
 
 # ==================================================
 # test-runner-go 対応状況と拡張方針

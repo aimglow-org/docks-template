@@ -15,27 +15,42 @@
 
 ## サブコマンド一覧（引数）
 
+### BE テスト
+
 | 引数 | 内容 | 成果物 |
 |---|---|---|
 | （なし） | 自動推定 | 次にやるべきテストステップを自動実行 |
-| `design {domain} {layer}` | テストデータ YAML 作成 | testdata/*.yaml |
-| `validate {domain} {layer}` | テスト定義の網羅性検証 | validation 結果 |
-| `generate {domain} {layer}` | テストコード生成 | *_test.go |
-| `run {domain} {layer}` | テスト実行 | テスト結果 |
-| `run-all {domain}` | 全層テスト実行 | テスト結果 |
-| `ci` | CI 相当の全テスト実行 | テスト結果 |
+| `design {domain} {layer}` | BE テストデータ YAML 作成 | testdata/*.yaml |
+| `validate {domain} {layer}` | BE テスト定義の網羅性検証 | validation 結果 |
+| `generate {domain} {layer}` | BE テストコード生成 | *_test.go |
+| `run {domain} {layer}` | BE テスト実行 | テスト結果 |
+| `run-all {domain}` | 全層テスト実行（BE + FE） | テスト結果 |
+| `ci` | CI 相当の全テスト実行（BE + FE） | テスト結果 |
+
+### FE テスト
+
+| 引数 | 内容 | 成果物 |
+|---|---|---|
+| `fe-design {domain} {fe-layer}` | FE テストデータ YAML 作成 | testdata/*.yaml |
+| `fe-validate {domain} {fe-layer}` | FE テスト定義の網羅性検証 | validation 結果 |
+| `fe-generate {domain} {fe-layer}` | FE テストコード生成 | *.test.ts / *_test.dart |
+| `fe-run {domain} {fe-layer}` | FE テスト実行 | テスト結果 |
+
+fe-layer: `state`, `api`, `components`（Domain FE）/ `design-system`（Design System）/ `e2e`（App 層）
 
 ---
 
 ## 自動推定ルール（引数なしの場合）
 
-`.task/impl-*.prog.md` のメタ情報から domain と layer を特定し、テストの進行状態からサブコマンドを決定する。
+`.task/impl-*.prog.md` のメタ情報から domain、layer、scope（be/fe）を特定し、テストの進行状態からサブコマンドを決定する。
 
 **判定ロジック（上から順に評価）:**
 
 1. `.task/impl-*.prog.md` が存在する？
    → No: 「進行中のタスクがありません」と報告して終了
-   → Yes: メタ情報から domain と layer を読み取り、次へ
+   → Yes: メタ情報から domain, layer, scope を読み取り、次へ
+
+**scope=be（または scope 未指定）の場合:**
 
 2. `libs/domains/{domain}/backend-{tech}/{layer}/testdata/` が存在しない or 空？
    → Yes: `/test design {domain} {layer}` を実行
@@ -52,16 +67,33 @@
 5. `_test.go` が存在する？
    → Yes: `/test run {domain} {layer}` を実行
 
-**validator 実行済みの判定:**
+**scope=fe の場合:**
+
+2. `libs/domains/{domain}/frontend-{tech}/{fe-layer}/testdata/` が存在しない or 空？
+   → Yes: `/test fe-design {domain} {fe-layer}` を実行
+   → No: 次へ
+
+3. validator 未実行 or testdata 変更後に未再実行？
+   → Yes: `/test fe-validate {domain} {fe-layer}` を実行
+   → No: 次へ
+
+4. テストコード（`*.test.ts` / `*_test.dart`）が存在しない？
+   → Yes: `/test fe-generate {domain} {fe-layer}` を実行
+   → No: 次へ
+
+5. テストコードが存在する？
+   → Yes: `/test fe-run {domain} {fe-layer}` を実行
+
+**validator 実行済みの判定（BE/FE 共通）:**
 - validate 結果で error が 0 件であること
 - testdata YAML の最終更新が validate 実行後であれば「再実行必要」と判定
 - 判定が曖昧な場合は validate を再実行する（安全側に倒す）
 
 ---
 
-## /test design {domain} {layer}
+## /test design {domain} {layer}（BE）
 
-**テストデータ YAML を作成する。実装コードの前に実行する。**
+**BE テストデータ YAML を作成する。実装コードの前に実行する。**
 
 layer: `define`, `usecase`, `infrastructure`, `entrypoint`, `platform`
 
@@ -122,9 +154,9 @@ layer: `define`, `usecase`, `infrastructure`, `entrypoint`, `platform`
 
 ---
 
-## /test validate {domain} {layer}
+## /test validate {domain} {layer}（BE）
 
-**テスト定義の網羅性を機械的に検証する。**
+**BE テスト定義の網羅性を機械的に検証する。**
 
 前提条件: testdata/*.yaml が存在すること
 
@@ -170,9 +202,9 @@ layer: `define`, `usecase`, `infrastructure`, `entrypoint`, `platform`
 
 ---
 
-## /test generate {domain} {layer}
+## /test generate {domain} {layer}（BE）
 
-**testdata YAML からテストコードを生成する。**
+**BE testdata YAML からテストコードを生成する。**
 
 1. `testdata/*.yaml` を読み込む
 2. strategy に応じてテストコードを生成する:
@@ -230,9 +262,9 @@ func TestSaveEntity(t *testing.T) {
 
 ---
 
-## /test run {domain} {layer}
+## /test run {domain} {layer}（BE）
 
-**指定層のテストを実行する。**
+**BE 指定層のテストを実行する。**
 
 1. 対象ディレクトリを特定: `libs/domains/{domain}/backend-{tech}/{layer}/`
 2. strategy に応じてテストを実行:
@@ -252,28 +284,41 @@ func TestSaveEntity(t *testing.T) {
 
 ## /test run-all {domain}
 
-**ドメイン全層のテストを実行する。**
+**ドメイン全層のテストを実行する（BE + FE）。**
 
+**BE:**
 1. define/ → usecase/ → infrastructure/ → entrypoint/ の順で実行
-2. 各層の結果をまとめて報告
-3. 全 PASS なら「全テスト通過」を報告
-4. 1つでも FAIL があれば、失敗箇所を明示して停止
+
+**FE（frontend-{tech}/ が存在する場合）:**
+2. state/ → api/ → components/ の順で実行
+
+**共通:**
+3. 各層の結果をまとめて報告
+4. 全 PASS なら「全テスト通過」を報告
+5. 1つでも FAIL があれば、失敗箇所を明示して停止
 
 ---
 
 ## /test ci
 
-**CI/CD 相当の全テスト実行。**
+**CI/CD 相当の全テスト実行（BE + FE）。**
 
+**BE:**
 1. `go test ./...`（data-driven テスト）
 2. `go test -tags=integration ./...`（統合テスト、DB 接続必要）
 3. `go test -tags=e2e ./...`（E2E テスト、MCP サーバー起動必要）
 4. `go vet ./...`（静的解析）
-5. 全結果をまとめて報告
+
+**FE（frontend-{tech}/ が存在する場合）:**
+5. `npm test -- --run`（unit / component テスト、Vitest）
+6. `npx playwright test`（E2E テスト、ブラウザ必要）
+
+**共通:**
+7. 全結果をまとめて報告
 
 ---
 
-## テストデータ YAML の書き方
+## BE テストデータ YAML の書き方
 
 ### data-driven（define/, usecase/）
 
@@ -359,3 +404,304 @@ func TestSaveEntity(t *testing.T) {
 | `called:{N}` | N回呼び出された |
 | `not_called` | 呼び出されなかった |
 | `called_with:{パターン}` | 指定パターンの引数で呼び出された |
+
+---
+
+# FE テストサブコマンド
+
+## /test fe-design {domain} {fe-layer}
+
+**FE テストデータ YAML を作成する。実装コードの前に実行する。**
+
+fe-layer: `state`, `api`, `components`（Domain FE）/ `design-system`（Design System）/ `e2e`（App 層）
+
+### 必読ソース（必ず読み込んでから作業する）
+
+| ソース | 用途 |
+|---|---|
+| `conventions/testing.yaml` | FE テスト体系・strategy 分類 |
+| `conventions/test-coverage.yaml` | ケース分類チェックリスト |
+| `domains/{domain}/fe-def.yaml` | FE コンポーネント・API ラッパー定義 |
+| `domains/{domain}/fe-state.yaml` | 状態管理設計 |
+| `domains/{domain}/fn-*.yaml` | 機能仕様（ui セクション） |
+| `domains/{domain}/rule.yaml` | バリデーションルール（BE/FE 共通） |
+| `domains/{domain}/detaildesign-fe.md` | FE テスト方針 |
+| `domains/{domain}/.task/test.spec.md` | テスト仕様（SSoT、FE セクション） |
+
+1. 上記の必読ソースをすべて読み込む
+2. test.spec.md の FE セクションを確認する（未作成なら追記する）
+3. fe-layer に応じた strategy を決定する:
+
+| fe-layer | strategy | requires | mock |
+|---|---|---|---|
+| state | unit | none | API レスポンス（MSW） |
+| api | unit | none | generated/ レスポンス |
+| components | component | none（jsdom） | props バリエーション |
+| design-system | component | none（jsdom） | props バリエーション + a11y |
+| e2e | e2e | browser（Playwright） | BE API（MSW or 実サーバー） |
+
+4. testdata/ に YAML を作成する:
+   - state/api: `libs/domains/{domain}/frontend-{tech}/{fe-layer}/testdata/`
+   - components: `libs/domains/{domain}/frontend-{tech}/components/testdata/`
+   - design-system: `libs/shared/design-system-{tech}/testdata/`
+   - e2e: `apps/{app-name}/testdata/`
+5. 各テストケースに以下を含める:
+   - name（テストケース名、日本語可）
+   - strategy（type, requires）
+   - input（props / action / API パラメータ）
+   - mock（API レスポンス定義）
+   - want（期待結果: エラー、レンダリング内容、状態変化）
+   - interaction（component テストのみ: ユーザー操作 → 期待結果）
+6. 網羅性を確認する:
+   - 正常系（全 props パターン、全 API レスポンスパターン）
+   - 異常系（API エラー、バリデーションエラー）
+   - インタラクション（ボタンクリック、フォーム送信、状態遷移）
+   - a11y（Design System の場合: axe-core 検証対象）
+7. コミットする
+8. `/test fe-validate {domain} {fe-layer}` を実行する
+
+---
+
+## /test fe-validate {domain} {fe-layer}
+
+**FE テスト定義の網羅性を検証する。**
+
+前提条件: testdata/*.yaml が存在すること
+
+1. 以下のファイルを読み込む:
+   - `testdata/*.yaml` — テスト定義
+   - `docs/domains/{domain}/fe-def.yaml` — コンポーネント・API 定義
+   - `docs/domains/{domain}/fe-state.yaml` — 状態設計
+   - `docs/domains/{domain}/fn-*.yaml` — 機能仕様（ui セクション）
+   - `docs/domains/{domain}/rule.yaml` — バリデーションルール
+
+2. 検証する（CC が testing.yaml の FE テスト体系に従って手動検証）:
+
+**必須検証（error — 実装ブロック）:**
+- fe-def.yaml の各コンポーネントに対するテストケースが存在するか
+- fe-def.yaml の各 API ラッパーに対するテストケースが存在するか
+- 正常系が最低 1 件存在するか
+- API エラー時の異常系が存在するか
+
+**推奨検証（warning）:**
+- fe-state.yaml のサーバー状態ごとにキャッシュ・楽観更新のテストが存在するか
+- rule.yaml のバリデーションルールに対する FE 側テストが存在するか
+- コンポーネントの全 props バリエーション（必須/任意/エッジ値）
+- インタラクションテスト（ユーザー操作→結果）
+- a11y テスト（Design System の場合）
+
+**情報提供（info）:**
+- ケース総数と分類内訳
+
+3. error が 0 件になるまで修正する
+4. `/rev test-design` の実行を提案する
+
+---
+
+## /test fe-generate {domain} {fe-layer}
+
+**FE testdata YAML からテストコードを生成する。**
+
+1. `testdata/*.yaml` を読み込む
+2. strategy に応じてテストコードを生成する:
+
+### unit（state/, api/）
+
+- YAML ローダー（test-runner-next の yaml-loader）で YAML をロード
+- mock 定義から MSW ハンドラを生成
+- want 定義からアサーションコードを生成
+
+生成パターン（Next.js）:
+
+```typescript
+// 例: use-orders.test.ts
+import { loadTestCases } from '@shared/test-runner-next';
+import { renderHook, waitFor } from '@testing-library/react';
+
+const cases = loadTestCases('testdata/use-orders.test.yaml');
+
+describe('useOrders', () => {
+  cases.forEach((tc) => {
+    it(tc.name, async () => {
+      // 1. mock setup（tc.mock から MSW ハンドラ生成）
+      setupMockApi(tc.mock);
+
+      // 2. execute
+      const { result } = renderHook(() => useOrders(tc.input));
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      // 3. assert（tc.want から自動生成）
+      assertWant(result.current, tc.want);
+
+      // 4. side_effect（tc.side_effect から検証）
+      verifySideEffects(tc.side_effect);
+    });
+  });
+});
+```
+
+### component（components/, design-system/）
+
+- props パターンを YAML からロード
+- render + レンダリング検証 + インタラクション検証を生成
+
+```typescript
+// 例: order-summary-card.test.tsx
+import { loadTestCases } from '@shared/test-runner-next';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+const cases = loadTestCases('testdata/order-summary-card.test.yaml');
+
+describe('OrderSummaryCard', () => {
+  cases.forEach((tc) => {
+    it(tc.name, async () => {
+      // 1. render（tc.input.props から）
+      render(<OrderSummaryCard {...tc.input.props} />);
+
+      // 2. assert renders（tc.want.renders から）
+      assertRenders(tc.want.renders);
+
+      // 3. interaction（tc.interaction から、存在する場合）
+      if (tc.interaction) {
+        await runInteractions(tc.interaction);
+        assertWant(tc.want);
+      }
+    });
+  });
+});
+```
+
+### e2e（App 層）
+
+- Playwright テストコードを生成
+- 画面遷移、フォーム操作、期待結果の検証
+
+3. 生成したテストコードをファイルに書き出す
+4. 型チェックが通ることを確認する（`npx tsc --noEmit`）
+5. コミットする
+6. `/rev test-code` の実行を提案する
+
+---
+
+## /test fe-run {domain} {fe-layer}
+
+**FE 指定層のテストを実行する。**
+
+1. 対象ディレクトリを特定する:
+   - state/api/components: `libs/domains/{domain}/frontend-{tech}/{fe-layer}/`
+   - design-system: `libs/shared/design-system-{tech}/`
+   - e2e: `apps/{app-name}/`
+
+2. strategy に応じてテストを実行する:
+
+| strategy | コマンド（Next.js） |
+|---|---|
+| unit | `npx vitest run --dir {対象ディレクトリ}` |
+| component | `npx vitest run --dir {対象ディレクトリ}` |
+| e2e | `npx playwright test --config {app}/playwright.config.ts` |
+
+3. 結果を整理して報告:
+   - PASS / FAIL の件数
+   - 失敗したテストケース名と理由
+   - カバレッジ（`--coverage` オプション付き）
+
+---
+
+## FE テストデータ YAML の書き方
+
+### unit（state/, api/）
+
+```yaml
+# use-orders.test.yaml
+- name: "正常系_一覧取得"
+  strategy:
+    type: unit
+    requires: none
+  input:
+    filters: { status: "active" }
+  mock:
+    api.listOrders:
+      status: 200
+      body: { orders: [{ id: "1", status: "active" }], total: 1 }
+  want:
+    error: null
+    data.orders.length: 1
+    data.orders[0].status: "active"
+  side_effect:
+    api.listOrders: called_once
+
+- name: "異常系_APIエラー"
+  strategy:
+    type: unit
+    requires: none
+  input:
+    filters: { status: "active" }
+  mock:
+    api.listOrders:
+      status: 500
+      body: { message: "Internal Server Error" }
+  want:
+    error: not_empty
+    data: null
+```
+
+### component（components/）
+
+```yaml
+# order-summary-card.test.yaml
+- name: "正常系_アクティブ注文の表示"
+  strategy:
+    type: component
+    requires: none
+  input:
+    props:
+      order: { id: "1", status: "active", total: 1500 }
+  want:
+    renders:
+      - text: "注文 #1"
+      - text: "¥1,500"
+      - testId: "status-badge"
+        attribute: { "data-status": "active" }
+
+- name: "インタラクション_キャンセルボタン"
+  strategy:
+    type: component
+    requires: none
+  input:
+    props:
+      order: { id: "1", status: "active", total: 1500 }
+      onCancel: "mock_fn"
+  interaction:
+    - action: click
+      target: { testId: "cancel-button" }
+  want:
+    onCancel: called_once
+```
+
+### want の特殊値（BE と共通）
+
+| 値 | 意味 |
+|---|---|
+| `null` | null / undefined / エラーなし |
+| `not_empty` | 空でなければ OK |
+| `any` | チェックをスキップ |
+| 具体的な値 | 完全一致 |
+
+### want.renders の検証指定（FE 固有）
+
+| キー | 意味 |
+|---|---|
+| `text: "..."` | 画面にテキストが表示されている |
+| `testId: "..."` | data-testid 要素が存在する |
+| `attribute: { key: value }` | 要素の属性値を検証 |
+| `not_exists: { testId: "..." }` | 要素が存在しないことを検証 |
+
+### interaction の操作指定（FE 固有）
+
+| action | 意味 |
+|---|---|
+| `click` | 要素をクリック |
+| `type` | テキスト入力（`value` キーで入力値を指定） |
+| `select` | セレクト選択（`value` キーで選択値を指定） |
+| `submit` | フォーム送信 |
