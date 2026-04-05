@@ -122,6 +122,22 @@
         - i: "対象: DB/Storage interface の実装"
         - i: "CC がテストコードを生成する"
 
+- i: "自動品質検証（テストランナーが自動実行）"
+  c:
+    - i: "カテゴリ網羅性: 各関数に正常系 + 異常系/障害系/準正常系 が最低1件ずつ"
+    - i: "Enum 網羅性: RegisterWithEnums で登録された enum の全値がテストケースに使われているか"
+    - i: "冪等性テスト: idempotency_key がある usecase は重複リクエストテストが必須"
+    - i: "Stub/Verify 整合性: stubs に定義された mock キーが verify にも存在するか（副作用検証漏れ防止）"
+    - i: "エラーコード網羅性: RegisterExpectedErrors で登録されたエラーコードが全てテストケースでカバーされているか"
+    - i: "FAIL 時は ACTION 指示（何をすべきか）を出力する"
+  n: |
+    テストランナーの Suite.Run() 終了時に自動実行される品質ゲート。
+    テストケース自体が PASS しても、品質検証で FAIL すると全体が FAIL になる。
+    skip_validation で明示的除外が可能（理由記載必須）。
+    demaetei プロジェクトの Identity ドメインで実証済み。
+    実装例: {domain}/testing/runner.go の validateCategories, validateEnumCoverage,
+    validateIdempotency, validateStubVerifyConsistency, validateErrorCoverage
+
 - i: "DB 環境方針"
   c:
     - i: "テストは Docker の PostgreSQL 18 で完結させる。GCP CloudSQL への接続はデプロイ後の動作確認のみ"

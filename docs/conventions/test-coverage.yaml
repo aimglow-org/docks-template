@@ -162,6 +162,20 @@
 # validator が検証するルール
 # ==================================================
 
+- i: "テストランナー自動品質検証（実行時に自動適用）"
+  c:
+    - i: "validateCategories: 各関数に正常系 + 異常系/障害系/準正常系 が最低1件ずつ存在するか"
+    - i: "validateEnumCoverage: RegisterWithEnums で登録された enum の全値がテストケースに使われているか"
+    - i: "validateIdempotency: idempotency_key がある usecase は重複リクエストテストが必須"
+    - i: "validateStubVerifyConsistency: stubs に定義された mock キーが verify にも存在するか（副作用検証漏れ防止）"
+    - i: "validateErrorCoverage: RegisterExpectedErrors で登録されたエラーコードが全てテストケースでカバーされているか"
+  n: |
+    テストランナーの Suite.Run() 終了時に自動実行される品質ゲート。
+    テストケース自体が PASS しても、品質検証で FAIL すると全体が FAIL になる。
+    skip_validation で明示的除外が可能（理由記載必須）。
+    これらの検証は test-runner-go ではなく各ドメインの testing/runner.go に実装する。
+    demaetei プロジェクトの Identity ドメインで実証済み。
+
 - i: "validator 検証ルール"
   c:
     - i: "必須検証（error レベル — 違反はテスト実行をブロック）"
