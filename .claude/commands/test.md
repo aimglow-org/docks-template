@@ -320,62 +320,79 @@ func TestSaveEntity(t *testing.T) {
 
 ## BE テストデータ YAML の書き方
 
-### data-driven（define/, usecase/）
+**テストデータ YAML は flat 形式で統一する。i/c/n 記法は使わない。**
+（設計書 YAML は i/c/n 記法を維持する）
+
+### define/ 層
 
 ```yaml
-# Workflowy 互換形式
-- c: "正常系_全項目指定"
-  children:
-    - c: "strategy"
-      children:
-        - i: "type: data-driven"
-        - i: "requires: none"
-    - c: "input"
-      children:
-        - i: "session_id: 'test-session-001'"
-        - i: "session_type: 'solviento'"
-        - i: "summary: 'テスト対話の要約'"
-        - i: "raw_log: '全文ログ内容'"
-    - c: "mock"
-      children:
-        - i: "{Entity}Repository.Store: success"
-        - i: "{Entity}LogStorage.Upload: success"
-    - c: "want"
-      children:
-        - i: "error: null"
-        - i: "id: not_empty"
-        - i: "gcs_path: not_empty"
-    - c: "side_effect"
-      children:
-        - i: "{Entity}Repository.Store: called_once"
-        - i: "{Entity}LogStorage.Upload: called_once"
-  n: "RawLog ありの正常系。GCS と CloudSQL 両方に保存される"
+functions:
+  - name: CanSuspend
+    cases:
+      - name: "UA-R01 正常系: active 状態で成功"
+        input:
+          status: active
+          role: hq_admin
+        want:
+          result: true
+      - name: "UA-R02 異常系: suspended 状態で不可"
+        input:
+          status: suspended
+        want:
+          result: false
+          error: ACCOUNT_INVALID_STATUS_TRANSITION
+```
+
+### usecase/ 層
+
+```yaml
+functions:
+  - name: SaveEntity
+    cases:
+      - name: "ENT-S-01 正常系: 全項目指定で保存成功"
+        input:
+          session_id: "test-session-001"
+          session_type: "solviento"
+          summary: "テスト対話の要約"
+          raw_log: "全文ログ内容"
+        stubs:
+          entity_repo:
+            store: { result: "ok" }
+          log_storage:
+            upload: { result: "gs://bucket/path" }
+        want:
+          status: ok
+          response:
+            id: not_empty
+            gcs_path: not_empty
+        verify:
+          entity_repo:
+            store: 1
+          log_storage:
+            upload: 1
 ```
 
 ### integration（infrastructure/）
 
 ```yaml
-- c: "FindByQuery_キーワード検索"
-  children:
-    - c: "strategy"
-      children:
-        - i: "type: integration"
-        - i: "requires: postgres"
-    - c: "setup"
-      children:
-        - i: "INSERT {table}: {id: '1', name: 'テストデータ1', category: 'category-a'}"
-        - i: "INSERT {table}: {id: '2', name: 'テストデータ2', category: 'category-b'}"
-    - c: "input"
-      children:
-        - i: "keyword: '設計'"
-        - i: "limit: 20"
-        - i: "offset: 0"
-    - c: "want"
-      children:
-        - i: "error: null"
-        - i: "total: 1"
-        - i: "results[0].id: '1'"
-  n: "summary の部分一致検索。ILIKE で大文字小文字を無視"
+functions:
+  - name: FindByQuery
+    cases:
+      - name: "REPO-Q-01 正常系: キーワード検索"
+        setup:
+          - table: entities
+            rows:
+              - { id: "1", name: "テストデータ1", category: "category-a" }
+              - { id: "2", name: "テストデータ2", category: "category-b" }
+        input:
+          keyword: "設計"
+          limit: 20
+          offset: 0
+        want:
+          error: null
+          total: 1
+          results:
+            - id: "1"
 ```
 
 ### want の特殊値

@@ -9,6 +9,7 @@
   },
   "devDependencies": {
     "@nx/devkit": "^16.0.0",
+    "@types/node": "^25.5.2",
     "nx": "^16.0.0",
     "typescript": "^5.0.0"
   }

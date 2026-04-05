@@ -70,7 +70,7 @@
       n: "曖昧表現の禁止:「〜する予定」「〜かもしれない」「〜を検討」「必要に応じて」「おそらく」「など」"
     - i: "Step 4: 実装タスク作成（/imp task）"
       c:
-        - i: ".task/impl-{nnn}.prog.md を作成する"
+        - i: ".task/impl-{nnn}.plan.md を作成する（未着手状態）"
         - i: "1タスク = 1つの完結した実装単位"
         - i: "タスクには対象ファイル、入力、期待する出力を明記する"
         - i: "依存タスク（先行タスク）を明記する"
@@ -99,8 +99,18 @@
         - i: "配置先: docs/domains/{domain}/.task/"
         - i: "shared の場合: docs/shared/{lib名}/.task/"
         - i: "ファイル名: impl-{nnn}.{status}.md"
-        - i: "status: prog（進行中）, done（完了）"
-        - i: "完了時にファイル名を impl-{nnn}.done.md にリネームする"
+        - i: "status 遷移: plan → prog → done"
+          c:
+            - i: "plan — 未着手。タスク定義済みだが作業未開始"
+            - i: "prog — 進行中。現在作業中のタスク"
+            - i: "done — 完了。全完了条件を満たしコミット済み"
+        - i: "遷移ルール"
+          c:
+            - i: "/imp task でタスク作成時: .plan.md で作成"
+            - i: "作業開始時: .plan.md → .prog.md にリネーム"
+            - i: "作業完了時: 完了条件チェックボックスを全て [x] に更新 → 完了メモ記入 → .prog.md → .done.md にリネーム → コミット"
+            - i: ".prog.md は同時に1ファイルのみ（並列作業でなければ）"
+      n: "3状態管理により、/imp・/rev・/test の自動推定がタスク状態から次アクションを決定できる"
     - i: "テンプレート（必須フィールド）"
       c:
         - i: |
@@ -149,11 +159,12 @@
             - i: "test-runner-go → test-runner"
             - i: "その他 → impl-shared"
           n: "shared の新しいパッケージが追加された場合、ここにマッピングを追加する"
-        - i: "status の意味"
+        - i: "status と各コマンドの挙動"
           c:
-            - i: "prog — 進行中。/rev はこのタスクの review フィールドを読んでレビュー種別を決定する"
-            - i: "done — 完了。/rev の対象外"
-      n: "/rev（引数なし）は .prog.md の review フィールドを読んでレビュー種別を自動決定する"
+            - i: "plan — 未着手。/imp が次に着手すべきタスクとして提案する"
+            - i: "prog — 進行中。/rev はこの review フィールドからレビュー種別を自動決定する。/test はこの layer フィールドからテスト対象を決定する"
+            - i: "done — 完了。/rev・/test の対象外"
+      n: "/imp（引数なし）は .prog.md を探し、なければ最小番号の .plan.md を提案する"
     - i: "GitHub Issues との関係"
       c:
         - i: "実装タスクは Issue 不要。.task/ で完結する"

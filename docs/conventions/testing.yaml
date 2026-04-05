@@ -2,6 +2,13 @@
 # TDD に基づくテストルール（BE/FE 共通）
 # 要素記法: i(アイテム — 全要素の基本), c(子要素リスト — i の下にネスト), n(ノート — 補足説明)
 
+- i: "YAML 形式の使い分け"
+  c:
+    - i: "設計書 YAML（def/rule/store/ref/fn-*）: i/c/n 記法（Workflowy 互換。人間の俯瞰性重視）"
+    - i: "規約 YAML（conventions/*）: i/c/n 記法（同上）"
+    - i: "テストデータ YAML（testdata/*）: flat 形式（Go struct マッピング。機械の可読性重視）"
+  n: "テストデータは Go の yaml.Unmarshal で struct に直接マッピングする。独自パーサー不要"
+
 - i: "テストファースト原則"
   c:
     - i: "設計完了後、実装より先にテストデータ（testdata/*.yaml）を作成する"
@@ -36,18 +43,15 @@
         - i: "YAML を変更したら test.spec.md との整合性を確認する"
         - i: "/rev の ALN（Alignment）チェックで3層の同期を検証する"
         - i: "BE/FE 両方に適用する"
-  n: "3層の同期が崩れるとテストの���頼性が低下する。/rev で検証する"
+  n: "3層の同期が崩れるとテストの信頼性が低下する。/rev で検証する"
 
-- i: "テスト��ータ YAML のフォ���マット"
+- i: "テストデータ YAML のフォーマット"
   c:
-    - i: "設計書 YAML: i/c/n 記法（Workflowy 互換）"
-    - i: "テ��トデータ YAML: flat 形式も許容する"
-      c:
-        - i: "flat 形式: functions/cases/input/want の階層構造"
-        - i: "Go パーサーとの親和性が高い"
-        - i: "既存の i/c/n 記法も引き続き使用可能"
-      n: "テストデータに限り flat 形式を標準とすることを推奨。Go テストランナーのパース実装が簡潔になる"
-  n: "規約 YAML は i/c/n 記法を維持。テストデータ YAML の��� flat 形式を許容する"
+    - i: "テストデータ YAML は flat 形式で統一する（i/c/n 記法は使わない）"
+    - i: "flat 形式: functions/cases/input/want の階層構造"
+    - i: "Go の yaml.Unmarshal で struct に直接マッピングできる"
+    - i: "test-runner-go の再利用性が高い（独自パーサー不要）"
+  n: "設計書・規約 YAML は i/c/n 記法を維持。テストデータ YAML のみ flat 形式"
 
 - i: "BE テストデータ構造（testdata/）"
   c:
@@ -59,40 +63,25 @@
       c:
         - i: "{対象関数名}_test.yaml"
         - i: "例: save_dialogue_test.yaml, search_dialogue_test.yaml"
-    - i: "YAML 構造（Workflowy 互換）"
+    - i: "YAML 構造（flat 形式）"
       c:
-        - i: "各テストケース"
+        - i: "トップレベル: functions（関数リスト）"
+        - i: "各関数: name + cases（テストケースリスト）"
+        - i: "各ケース: name, input, want, stubs, verify"
           c:
-            - i: "c: テストケース名（日本語可）"
-            - i: "children"
+            - i: "name: テストケース名（日本語可、ID プレフィックス推奨）"
+            - i: "input: 入力パラメータ（キー: 値）"
+            - i: "want: 期待結果（result, error, 各フィールド）"
+            - i: "stubs: モック動作定義（data-driven のみ）"
               c:
-                - i: "strategy（テスト戦略）"
-                  c:
-                    - i: "type: data-driven | integration | e2e"
-                    - i: "requires: none | postgres | gcs | mcp-server"
-                  n: "data-driven は runner が機械的に処理。integration/e2e は CC がテストコード生成"
-                - i: "input（入力データ）"
-                  c:
-                    - i: "キー: 値 の形式で入力パラメータを定義"
-                - i: "mock（モック動作定義）"
-                  c:
-                    - i: "{Interface名}.{Method名}: success | error:{エラー内容} | skip"
-                  n: "data-driven のみ。runner がモックをセットアップする"
-                - i: "setup（事前データ投入）"
-                  c:
-                    - i: "INSERT {table}: {データ}"
-                    - i: "UPLOAD {path}: {データ}"
-                  n: "integration のみ。DB/GCS への事前データ投入"
-                - i: "want（期待結果）"
-                  c:
-                    - i: "error: null | {エラー変数名}"
-                    - i: "フィールド名: 値 | not_empty | any"
-                - i: "side_effect（副作用の検証）"
-                  c:
-                    - i: "{Interface名}.{Method名}: called_with:{引数パターン}"
-                    - i: "{Interface名}.{Method名}: not_called"
-                  n: "モックの呼び出し検証。data-driven で使用"
-            - i: "n: テストケースの補足説明"
+                - i: "{interface名}.{method名}: { result: 値 } | { err: エラー内容 }"
+              n: "data-driven のみ。runner がモックをセットアップする"
+            - i: "verify: 副作用の検証（モック呼び出し回数）"
+              c:
+                - i: "{interface名}.{method名}: 呼び出し回数"
+              n: "モックの呼び出し検証。data-driven で使用"
+            - i: "setup: 事前データ投入（integration のみ）"
+      n: "Go の yaml.Unmarshal で struct に直接マッピングできる形式"
 
 - i: "BE テストカテゴリと層別方針"
   c:
@@ -136,6 +125,22 @@
         - i: "requires: postgres | gcs"
         - i: "対象: DB/Storage interface の実装"
         - i: "CC がテストコードを生成する"
+
+- i: "自動品質検証（テストランナーが自動実行）"
+  c:
+    - i: "カテゴリ網羅性: 各関数に正常系 + 異常系/障害系/準正常系 が最低1件ずつ"
+    - i: "Enum 網羅性: RegisterWithEnums で登録された enum の全値がテストケースに使われているか"
+    - i: "冪等性テスト: idempotency_key がある usecase は重複リクエストテストが必須"
+    - i: "Stub/Verify 整合性: stubs に定義された mock キーが verify にも存在するか（副作用検証漏れ防止）"
+    - i: "エラーコード網羅性: RegisterExpectedErrors で登録されたエラーコードが全てテストケースでカバーされているか"
+    - i: "FAIL 時は ACTION 指示（何をすべきか）を出力する"
+  n: |
+    テストランナーの Suite.Run() 終了時に自動実行される品質ゲート。
+    テストケース自体が PASS しても、品質検証で FAIL すると全体が FAIL になる。
+    skip_validation で明示的除外が可能（理由記載必須）。
+    demaetei プロジェクトの Identity ドメインで実証済み。
+    実装例: {domain}/testing/runner.go の validateCategories, validateEnumCoverage,
+    validateIdempotency, validateStubVerifyConsistency, validateErrorCoverage
 
 - i: "DB 環境方針"
   c:
@@ -475,7 +480,7 @@
           c:
             - i: "testdata/*.yaml の読み込みとパース"
             - i: "Generics による型付きテストケースのデシリアライズ"
-            - i: "i/c/n 記法（Workflowy 互換）の解釈"
+            - i: "flat 形式（functions/cases 構造）のパース"
           n: "全層で使用。テスト基盤の入口"
         - i: "CoverageValidator"
           c:
