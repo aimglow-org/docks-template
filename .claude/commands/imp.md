@@ -17,7 +17,7 @@
 | `detail-design {domain}` | 詳細設計 | detaildesign-be.md |
 | `ui-design {domain}` | UI 設計 | Figma デザイン + Code Connect |
 | `ui-mock {domain}` | Mock アプリ実装 | apps/mock-{project}-{framework}/ |
-| `task {domain}` | 実装タスク作成 | .task/impl-{nnn}.prog.md |
+| `task {domain}` | 実装タスク作成 | .task/impl-{nnn}.plan.md |
 | `code {domain} {task_number}` | コード実装 | Go ソースコード |
 | `deploy` | デプロイ | Cloud Run サービス |
 
@@ -45,11 +45,16 @@
    → Yes: メタ情報を読み取り `/imp code {domain} {task_number}` を実行
    → No: 次へ
 
-2. `.task/` ディレクトリに `.prog.md` がなく `.done.md` のみ + 全タスク完了？
+2. `.task/impl-*.plan.md` が存在する？
+   → Yes: 最小番号の `.plan.md` を提案（「impl-{nnn} を開始しますか？」）
+   → ユーザー承認後、`.plan.md` → `.prog.md` にリネームして `/imp code` を実行
+   → No: 次へ
+
+3. `.task/` に `.plan.md` も `.prog.md` もなく `.done.md` のみ？
    → Yes: `/imp deploy` を提案
    → No: 次へ
 
-3. `detaildesign-be.md` が存在し、`.task/` が未作成？
+4. `detaildesign-be.md` が存在し、`.task/` が未作成？
    → Yes: UI 判定へ（ステップ 3a）
    → No: 次へ
 
@@ -226,7 +231,8 @@ YAML 要素記法:
    - platform/ の各クライアント → 各 1 タスク
    - entrypoint/ → 1 タスク
    - main.go（DI 組み立て） → 1 タスク
-4. 各タスクを `impl-{nnn}.prog.md` として作成する。
+4. 各タスクを `impl-{nnn}.plan.md`（未着手）として作成する。
+   作業着手時に `.plan.md` → `.prog.md` にリネームする。
    テンプレートは `conventions/implementation.yaml` の「テンプレート（必須フィールド）」に従う。
    **必ず メタ情報（domain, layer, review）を正確に記載すること。**
    `/rev`（引数なし）はこのメタ情報から自動でレビュー種別を決定する。
@@ -258,10 +264,11 @@ YAML 要素記法:
    - conventions/ の規約に従う
    - 即時都度コミットする（小さく頻繁に）
 7. `/test run {domain} {layer}` を実行: テストを全 PASS にする
-8. タスクファイルの完了条件をチェックする
-9. タスクファイルを `impl-{task_number}.done.md` にリネームする
-10. 完了メモを記入する
-11. コミットする
+8. **タスク完了処理:**
+   a. `.prog.md` の完了条件���ェックボックスを全て `[x]` に更新する
+   b. 完了メモセクションに作業サマリを記入する
+   c. ファイル名を `.prog.md` → `.done.md` にリネームする
+   d. コミットする
 12. 該当レイヤーの `/rev impl-{layer}` の実行を提案する
 
 **テストファーストの原則:**
