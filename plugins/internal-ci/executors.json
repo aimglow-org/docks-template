@@ -1,0 +1,9 @@
+{
+  "executors": {
+    "setup-auth": {
+      "implementation": "./src/executors/setup-auth/executor",
+      "schema": "./src/executors/setup-auth/schema.json",
+      "description": "Setup GCP Auth"
+    }
+  }
+}

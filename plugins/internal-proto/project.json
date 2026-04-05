@@ -1,0 +1,20 @@
+{
+  "name": "internal-proto",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "plugins/internal-proto/src",
+  "projectType": "library",
+  "targets": {
+    "sync-schema": {
+      "executor": "@{{org}}/internal-proto:sync-schema",
+      "description": "Sync Schema from Orphan Branch"
+    },
+    "lint": {
+      "executor": "@nx/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["plugins/internal-proto/**/*.ts"]
+      }
+    }
+  },
+  "tags": ["scope:plugin", "type:proto"]
+}

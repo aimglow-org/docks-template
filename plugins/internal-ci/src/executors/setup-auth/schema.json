@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "cli": "nx",
+  "title": "Setup Authentication for GCP",
+  "description": "Checks and helps setup Google Cloud authentication for Artifact Registry and other GCP services.",
+  "properties": {
+    "domain": {
+      "type": "string",
+      "description": "Required email domain for GCloud account"
+    },
+    "project": {
+      "type": "string",
+      "description": "Required GCP project ID"
+    },
+    "region": {
+      "type": "string",
+      "description": "Artifact Registry region"
+    },
+    "repo": {
+      "type": "string",
+      "description": "Artifact Registry repository name"
+    }
+  },
+  "required": []
+}

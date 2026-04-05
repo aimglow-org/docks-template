@@ -1,0 +1,9 @@
+{
+  "executors": {
+    "sync-schema": {
+      "implementation": "./src/executors/sync-schema/executor",
+      "schema": "./src/executors/sync-schema/schema.json",
+      "description": "Sync generated code from api-schema branch"
+    }
+  }
+}
